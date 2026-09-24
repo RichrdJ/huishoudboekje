@@ -827,16 +827,30 @@ def recategorize():
 @app.route("/api/subscriptions")
 @requires_auth
 def subscriptions():
-    """Herkent terugkerende vaste lasten: zelfde tegenpartij, (bijna) zelfde bedrag,
-    in minstens 3 verschillende maanden."""
+    """Herkent vaste lasten als terugkerende bedragen per tegenpartij.
+
+    Per partij worden afschrijvingen gegroepeerd tot 'reeksen' van (vrijwel) hetzelfde
+    bedrag: elke stap mag max. 2% (of 50 cent) afwijken, zodat bijv. een aflopende
+    annuïteit één reeks blijft. Een reeks is een vaste last als hij in minstens 3
+    maanden voorkomt, max. één keer per maand, en in minstens 75% van de maanden
+    tussen de eerste en laatste keer. Een partij kan meerdere reeksen hebben, zoals een
+    hypotheek met meerdere leningdelen; het maandbedrag is de som van de actieve reeksen.
+    Pinbetalingen tellen niet mee (vaste lasten zijn incasso's en overboekingen), en de
+    reeksen moeten minstens de helft van de transacties met die partij beslaan. Zo vallen
+    winkels waar je vaak komt af, ook als er toevallig een paar keer hetzelfde bedrag is."""
     conn = db()
     kinds = category_kinds(conn)
     all_months = [r[0] for r in conn.execute(
         "SELECT DISTINCT substr(date,1,7) FROM transactions ORDER BY 1")]
-    last_month = all_months[-1] if all_months else None
+    if not all_months:
+        return jsonify([])
+    active_from = all_months[-2] if len(all_months) > 1 else all_months[-1]
+    month_idx = lambda m: int(m[:4]) * 12 + int(m[5:7])
+
     groups = defaultdict(list)
     for r in conn.execute(
-            "SELECT date, name, amount, category FROM transactions WHERE amount < 0 ORDER BY date"):
+            "SELECT date, name, amount, category FROM transactions "
+            "WHERE amount < 0 AND COALESCE(mutation_type, '') != 'Betaalautomaat' ORDER BY date, id"):
         if kinds.get(r["category"], "uitgave") != "uitgave":
             continue
         key = re.sub(r"[^a-z]+", " ", (r["name"] or "").lower()).strip()
@@ -844,31 +858,42 @@ def subscriptions():
 
     result = []
     for key, items in groups.items():
-        by_month = defaultdict(float)
+        series = []  # elke reeks: lijst van (maand, bedrag, datum)
         for it in items:
-            by_month[it["date"][:7]] += -it["amount"]
-        if len(by_month) < 3:
+            amount, month = -it["amount"], it["date"][:7]
+            for sr in series:
+                last_month, last_amount, _ = sr[-1]
+                if last_month != month and abs(amount - last_amount) <= max(0.5, 0.02 * last_amount):
+                    sr.append((month, amount, it["date"]))
+                    break
+            else:
+                series.append([(month, amount, it["date"])])
+
+        valid = []
+        for sr in series:
+            months = [m for m, _, _ in sr]
+            span = month_idx(months[-1]) - month_idx(months[0]) + 1
+            if len(months) >= 3 and len(months) / span >= 0.75:
+                valid.append(sr)
+        if not valid or sum(len(sr) for sr in valid) < 0.5 * len(items):
             continue
-        amounts = list(by_month.values())
-        med = statistics.median(amounts)
-        if med <= 0:
-            continue
-        spread = statistics.pstdev(amounts) / med
-        occurrences_per_month = len(items) / len(by_month)
-        # Vaste lasten: stabiel bedrag en ongeveer één afschrijving per maand
-        if spread > 0.15 or occurrences_per_month > 1.5:
-            continue
-        months_sorted = sorted(by_month)
+        active = [sr for sr in valid if sr[-1][0] >= active_from]
+        shown = active or [max(valid, key=lambda sr: sr[-1][2])]
+        monthly = sum(sr[-1][1] for sr in shown)
+        last = max(items, key=lambda it: it["date"])
         result.append({
-            "name": items[-1]["name"],
-            "category": items[-1]["category"],
-            "monthly": round(med, 2),
-            "yearly": round(med * 12, 2),
-            "months": len(by_month),
-            "last_date": items[-1]["date"],
-            "active": months_sorted[-1] >= (all_months[-2] if len(all_months) > 1 else last_month),
-            "last_amount": round(-items[-1]["amount"], 2),
-            "changed": abs(-items[-1]["amount"] - med) > 0.01 and len(items) > 1,
+            "name": last["name"],
+            "category": last["category"],
+            "monthly": round(monthly, 2),
+            "yearly": round(monthly * 12, 2),
+            "months": len({m for sr in valid for m, _, _ in sr}),
+            "per_month": len(shown),
+            "parts": [round(sr[-1][1], 2) for sr in shown],
+            "last_date": max(sr[-1][2] for sr in shown),
+            "active": bool(active),
+            "last_amount": round(monthly, 2),
+            # Er is een reeks gestopt terwijl er een andere loopt: prijs- of contractwijziging
+            "changed": bool(active) and len(valid) > len(active),
         })
     result.sort(key=lambda x: (not x["active"], -x["monthly"]))
     return jsonify(result)

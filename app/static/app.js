@@ -620,11 +620,11 @@ async function renderSubscriptions() {
     <div class="kpi"><div class="label">Per jaar</div><div class="value">${fmt0(monthly * 12)}</div></div>
     <div class="kpi"><div class="label">Waarvan abonnementen en streaming</div><div class="value">${fmt0(active.filter((s) => s.category === "Abonnementen en streaming").reduce((a, b) => a + b.monthly, 0))}</div><div class="delta">per maand</div></div>`;
   el("subs-body").innerHTML = subs.map((s) => `<tr>
-      <td class="desc"><b>${esc(s.name)}</b><span>${s.months} maanden gezien</span></td>
+      <td class="desc"><b>${esc(s.name)}</b><span>${s.months} maanden gezien${s.parts.length > 1 ? ` · ${s.parts.length} afschrijvingen per maand: ${s.parts.map(fmt).join(" + ")}` : ""}</span></td>
       <td><span class="pill">${esc(s.category)}</span></td>
       <td class="num">${fmt(s.monthly)}</td>
       <td class="num">${fmt(s.yearly)}</td>
-      <td class="date">${s.last_date.split("-").reverse().join("-")}${s.changed ? `<br><span class="sub" style="font-size:11px">laatst ${fmt(s.last_amount)}</span>` : ""}</td>
+      <td class="date">${s.last_date.split("-").reverse().join("-")}${s.changed ? `<br><span class="sub" style="font-size:11px">bedrag of contract gewijzigd</span>` : ""}</td>
       <td>${s.active ? `<span class="status"><i style="background:var(--good)"></i>Actief</span>` : `<span class="status"><i style="background:var(--text-muted)"></i>Gestopt?</span>`}</td>
     </tr>`).join("") || `<tr><td colspan="6" class="sub" style="padding:20px">Upload minimaal 3 maanden om vaste lasten te herkennen.</td></tr>`;
 }

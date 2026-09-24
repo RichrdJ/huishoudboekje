@@ -5,6 +5,17 @@ Versienummers volgen [Semantic Versioning](https://semver.org/lang/nl/): het mid
 
 Updaten in Portainer: open de stack → **Pull and redeploy**. De database wordt bij het opstarten automatisch bijgewerkt en je gegevens blijven bewaard.
 
+## [0.9.0] - 2026-09-24
+
+### Opgelost
+- **Een vaste last met meerdere afschrijvingen per maand wordt nu herkend**, bijvoorbeeld een hypotheek met meerdere leningdelen. Voorheen viel alles af wat vaker dan één keer per maand werd afgeschreven.
+- Vaste lasten met een gewijzigd contract of bedrag worden ook herkend. Een incidentele dubbele afschrijving in een maand sluit een vaste last niet meer uit.
+
+### Gewijzigd
+- De herkenning zoekt per partij naar **terugkerende bedragen** die in minstens 3 maanden voorkomen, max. één keer per maand. Een langzaam aflopend bedrag, zoals een annuïteit, telt als één bedrag. Het maandbedrag is de som van de bedragen die nog lopen.
+- Pinbetalingen tellen niet meer mee, en de terugkerende bedragen moeten minstens de helft van de transacties met die partij zijn. Zo verschijnen supermarkten en webwinkels niet meer onterecht als vaste last.
+- Bij meerdere afschrijvingen per maand toont het overzicht de afzonderlijke bedragen. Een gewijzigd contract of bedrag wordt gemarkeerd.
+
 ## [0.8.0] - 2026-09-24
 
 ### Toegevoegd
@@ -86,6 +97,7 @@ Updaten in Portainer: open de stack → **Pull and redeploy**. De database wordt
 - Regels beheren, en de categorie per transactie aanpassen.
 - Compose-bestanden voor Portainer en een GitHub Actions-workflow die de image naar ghcr.io publiceert.
 
+[0.9.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.5.0...v0.6.0
