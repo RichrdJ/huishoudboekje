@@ -10,37 +10,54 @@ UNCATEGORIZED = "Ongecategoriseerd"
 # (naam, soort) - soort: uitgave | inkomen | overboeking
 CATEGORIES = [
     ("Boodschappen", "uitgave"),
-    ("Thuisbezorgd & afhaal", "uitgave"),
-    ("Uit eten & horeca", "uitgave"),
-    ("Abonnementen & streaming", "uitgave"),
-    ("Wonen", "uitgave"),
-    ("Energie & water", "uitgave"),
-    ("Telefoon & internet", "uitgave"),
-    ("Verzekeringen & zorg", "uitgave"),
-    ("Vervoer & auto", "uitgave"),
+    ("Thuisbezorgd en afhaal", "uitgave"),
+    ("Uit eten en horeca", "uitgave"),
+    ("Abonnementen en streaming", "uitgave"),
+    ("Hypotheek", "uitgave"),
+    ("Energie", "uitgave"),
+    ("Water", "uitgave"),
+    ("Verzekeringen", "uitgave"),
+    ("Vervoer", "uitgave"),
     ("Online winkelen", "uitgave"),
-    ("Kleding & schoenen", "uitgave"),
-    ("Drogisterij & verzorging", "uitgave"),
-    ("Huis & tuin", "uitgave"),
     ("Kinderen", "uitgave"),
-    ("Huisdieren", "uitgave"),
-    ("Vrije tijd & uitjes", "uitgave"),
-    ("Vakantie & reizen", "uitgave"),
-    ("Gezondheid", "uitgave"),
-    ("Belastingen & gemeente", "uitgave"),
-    ("Goede doelen & cadeaus", "uitgave"),
-    ("Contant geld", "uitgave"),
-    ("Bankkosten", "uitgave"),
-    ("Betaalverzoeken & personen", "uitgave"),
     ("Overige uitgaven", "uitgave"),
     ("Salaris", "inkomen"),
     ("Inleg partners", "inkomen"),
-    ("Toeslagen & teruggaven", "inkomen"),
     ("Overige inkomsten", "inkomen"),
-    ("Sparen & beleggen", "overboeking"),
-    ("Interne overboeking", "overboeking"),
+    ("Sparen", "overboeking"),
     (UNCATEGORIZED, "uitgave"),
 ]
+
+# Oude categorienamen (vorige versies) -> nieuwe. Wordt bij het opstarten toegepast
+# op bestaande transacties en eigen regels.
+MIGRATE_CATEGORIES = {
+    "Thuisbezorgd & afhaal": "Thuisbezorgd en afhaal",
+    "Uit eten & horeca": "Uit eten en horeca",
+    "Abonnementen & streaming": "Abonnementen en streaming",
+    "Telefoon & internet": "Abonnementen en streaming",
+    "Wonen": "Hypotheek",
+    "Energie & water": "Energie",
+    "Verzekeringen & zorg": "Verzekeringen",
+    "Vervoer & auto": "Vervoer",
+    "Kleding & schoenen": "Overige uitgaven",
+    "Drogisterij & verzorging": "Overige uitgaven",
+    "Huis & tuin": "Overige uitgaven",
+    "Huisdieren": "Overige uitgaven",
+    "Vrije tijd & uitjes": "Overige uitgaven",
+    "Vakantie & reizen": "Overige uitgaven",
+    "Gezondheid": "Overige uitgaven",
+    "Belastingen & gemeente": "Overige uitgaven",
+    "Goede doelen & cadeaus": "Overige uitgaven",
+    "Contant geld": "Overige uitgaven",
+    "Bankkosten": "Overige uitgaven",
+    "Betaalverzoeken & personen": "Overige uitgaven",
+    "Toeslagen & teruggaven": "Overige inkomsten",
+    "Sparen & beleggen": "Sparen",
+    "Interne overboeking": "Sparen",
+}
+
+WATER_PATTERNS = {"waternet", "vitens", "evides", "brabant water", "pwn ", "dunea", "oasen",
+                  "wml ", "waterbedrijf", "waterschap", "hoogheemraadschap"}
 
 # (patroon, categorie, richting) - richting: "af", "bij" of "" (beide)
 DEFAULT_RULES = [
@@ -203,11 +220,22 @@ DEFAULT_RULES = [
     ("peaks", "Sparen & beleggen", ""),
 ]
 
+
+def _migrate_rule(rule):
+    pattern, category, direction = rule
+    if pattern in WATER_PATTERNS:
+        return (pattern, "Water", "")
+    return (pattern, MIGRATE_CATEGORIES.get(category, category), direction)
+
+
+DEFAULT_RULES = [_migrate_rule(r) for r in DEFAULT_RULES]
+
 # ISO-landcodes die ING achter de naam van buitenlandse pinbetalingen zet.
-# Een pinbetaling in het buitenland valt automatisch onder vakantie.
+# Zet FOREIGN_CATEGORY op een categorienaam om pinbetalingen in het buitenland
+# automatisch in te delen (bijv. een eigen categorie "Vakantie"); None = uit.
 FOREIGN_COUNTRY_CODES = {
     "DEU", "BEL", "LUX", "FRA", "ESP", "PRT", "ITA", "AUT", "CHE", "GBR", "IRL", "DNK", "SWE",
     "NOR", "FIN", "POL", "CZE", "HUN", "HRV", "SVN", "SVK", "GRC", "TUR", "CYP", "MLT", "USA",
     "CAN", "MEX", "THA", "IDN", "ISL", "EST", "LVA", "LTU", "ROU", "BGR", "MAR", "EGY", "ARE",
 }
-FOREIGN_CATEGORY = "Vakantie & reizen"
+FOREIGN_CATEGORY = None

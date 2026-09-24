@@ -12,13 +12,13 @@ from flask import Flask, g, jsonify, redirect, request, send_from_directory, ses
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from categories import (CATEGORIES, DEFAULT_RULES, FOREIGN_CATEGORY, FOREIGN_COUNTRY_CODES,
-                        UNCATEGORIZED)
+                        MIGRATE_CATEGORIES, UNCATEGORIZED)
 from ing_parser import ParseError, parse_ing_csv
 from ing_parser import _parse_amount as parse_amount
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 DB_PATH = os.path.join(DATA_DIR, "huishoudboekje.db")
-RULES_VERSION = "3"
+RULES_VERSION = "4"
 PW_METHOD = "pbkdf2:sha256:600000"
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -89,6 +89,15 @@ def init_db():
         [(n, k, i) for i, (n, k) in enumerate(CATEGORIES)])
     version = conn.execute("SELECT value FROM meta WHERE key='rules_version'").fetchone()
     if not version or version[0] != RULES_VERSION:
+        # Oude standaardcategorieën samenvoegen in de nieuwe, compactere set
+        existing = {r[0] for r in conn.execute("SELECT name FROM categories")}
+        for old, new in MIGRATE_CATEGORIES.items():
+            if old in existing:
+                conn.execute("UPDATE transactions SET category=? WHERE category=?", (new, old))
+                conn.execute("UPDATE rules SET category=? WHERE category=?", (new, old))
+                conn.execute("DELETE FROM categories WHERE name=?", (old,))
+        conn.executemany("UPDATE categories SET position=? WHERE name=?",
+                         [(i, n) for i, (n, _) in enumerate(CATEGORIES)])
         conn.execute("DELETE FROM rules WHERE user_defined=0")
         conn.executemany(
             "INSERT INTO rules(pattern, category, direction, user_defined) VALUES (?,?,?,0)",
@@ -305,7 +314,7 @@ def categorize(tx, rules):
     name_hay = _haystack(tx.get("name"), tx.get("counter_account"))
     haystack = _haystack(tx.get("name"), tx.get("counter_account"), tx.get("description"))
     is_debit = tx["amount"] < 0
-    foreign = _is_foreign_card_payment(tx)
+    foreign = FOREIGN_CATEGORY is not None and _is_foreign_card_payment(tx)
     for pattern, category, direction, user_defined, amount, name_only in rules:
         # Buitenlandse pinbetalingen gaan voor op standaardregels, niet op eigen regels
         if foreign and not user_defined:
@@ -321,7 +330,7 @@ def categorize(tx, rules):
     if not is_debit:
         return "Overige inkomsten"
     if tx.get("mutation_type") in ("Online bankieren", "Overschrijving"):
-        return "Betaalverzoeken & personen"
+        return "Overige uitgaven"
     return UNCATEGORIZED
 
 

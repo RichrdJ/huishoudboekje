@@ -617,7 +617,7 @@ async function renderSubscriptions() {
   el("subs-kpis").innerHTML = `
     <div class="kpi"><div class="label">Vaste lasten per maand</div><div class="value">${fmt0(monthly)}</div><div class="delta">${active.length} actieve posten</div></div>
     <div class="kpi"><div class="label">Per jaar</div><div class="value">${fmt0(monthly * 12)}</div></div>
-    <div class="kpi"><div class="label">Waarvan abonnementen & streaming</div><div class="value">${fmt0(active.filter((s) => s.category === "Abonnementen & streaming").reduce((a, b) => a + b.monthly, 0))}</div><div class="delta">per maand</div></div>`;
+    <div class="kpi"><div class="label">Waarvan abonnementen en streaming</div><div class="value">${fmt0(active.filter((s) => s.category === "Abonnementen en streaming").reduce((a, b) => a + b.monthly, 0))}</div><div class="delta">per maand</div></div>`;
   el("subs-body").innerHTML = subs.map((s) => `<tr>
       <td class="desc"><b>${esc(s.name)}</b><span>${s.months} maanden gezien</span></td>
       <td><span class="pill">${esc(s.category)}</span></td>

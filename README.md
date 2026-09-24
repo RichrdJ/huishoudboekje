@@ -7,8 +7,12 @@ Alles draait lokaal in één container met SQLite. Er gaan geen bankgegevens naa
 ## Functies
 
 - **Upload** van ING CSV-exports (puntkomma- en kommaformaat, Nederlands en Engels). Overlappende periodes geven geen dubbele transacties.
-- **Automatische categorieën**: ruim 500 herkenningsregels voor Nederlandse winkels en diensten (AH, Jumbo, Thuisbezorgd, Netflix, Vattenfall, Zilveren Kruis, bol, Coolblue…).
-  - Pinbetalingen in het buitenland → *Vakantie & reizen*
+- **Automatische categorieën**: ruim 500 herkenningsregels voor Nederlandse winkels en diensten (AH, Jumbo, Thuisbezorgd, Netflix, Vattenfall, Zilveren Kruis, bol, Coolblue…). De standaardset is bewust compact:
+  - *Uitgaven*: Boodschappen, Thuisbezorgd en afhaal, Uit eten en horeca, Abonnementen en streaming, Hypotheek, Energie, Water, Verzekeringen, Vervoer, Online winkelen, Kinderen, Overige uitgaven
+  - *Inkomsten*: Salaris, Inleg partners, Overige inkomsten
+  - *Overboeking (telt niet mee)*: Sparen
+
+  Meer nodig, bijvoorbeeld *Vakantie* of *Kleding*? Maak de categorie aan in het tabblad *Categorieën* en verplaats de transacties.
   - Terugbetalingen (bijv. een retour bij bol) verlagen de uitgaven in die categorie
   - Overboekingen van en naar de spaarrekening tellen niet als inkomen of uitgave
   - Stortingen vanaf jullie privérekeningen → *Inleg partners*. Die rekeningen vink je aan in *Instellingen*; de app stelt ze zelf voor.
