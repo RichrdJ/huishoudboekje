@@ -308,3 +308,23 @@ main { max-width: 1240px; margin: 0 auto; padding: 24px; }
 }
 .stack-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-secondary); }
 @media (max-width: 860px) { .settings-grid { grid-template-columns: 1fr; } }
+
+/* ---------- keuzevenster ---------- */
+.modal {
+  border: 1px solid var(--border); border-radius: 16px; padding: 22px; width: min(480px, calc(100vw - 32px));
+  background: var(--surface-1); color: var(--text-primary); box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.modal::backdrop { background: rgba(0,0,0,.45); }
+.modal h3 { font-size: 17px; margin-bottom: 8px; }
+.move-summary { margin: 0 0 16px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.move-summary b { color: var(--text-primary); }
+.modal .opt {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; cursor: pointer;
+}
+.modal .opt:has(input:checked) { border-color: var(--series-1); background: color-mix(in srgb, var(--series-1) 7%, transparent); }
+.modal .opt input[type=radio] { margin-top: 3px; accent-color: var(--series-1); }
+.modal .pattern-row { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; color: var(--text-secondary); flex-wrap: wrap; }
+.modal .pattern-row input { flex: 1; min-width: 140px; min-height: 30px; padding: 4px 8px; }
+.modal .sub { display: block; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

@@ -229,6 +229,28 @@
     </section>
   </main>
 
+  <dialog id="move-dialog" class="modal">
+    <form method="dialog" id="move-form">
+      <h3>Categorie wijzigen</h3>
+      <p class="move-summary"><b id="move-name"></b><span id="move-from"></span> → <b id="move-to"></b></p>
+      <label class="opt">
+        <input type="radio" name="scope" value="all" checked>
+        <span><b>Alle transacties van deze partij</b>, ook toekomstige uploads
+          <span class="pattern-row">die <input id="move-pattern" autocomplete="off" aria-label="Zoektekst"> bevatten</span>
+          <span class="sub" id="move-count"></span>
+        </span>
+      </label>
+      <label class="opt">
+        <input type="radio" name="scope" value="one">
+        <span><b>Alleen deze transactie</b></span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn ghost" value="cancel" formnovalidate>Annuleren</button>
+        <button class="btn primary" value="ok" id="move-ok">Toepassen</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" hidden></div>
   <div id="drop-overlay" class="drop-overlay" hidden><div>Laat los om te uploaden</div></div>

@@ -395,21 +395,71 @@ async function renderTransactions() {
     updateBulkbar();
   }));
 
-  el("tx-body").querySelectorAll(".cat-select").forEach((sel) => sel.addEventListener("change", async (e) => {
-    const tr = e.target.closest("tr");
-    const name = tr.dataset.name;
-    const makeRule = name && confirm(`Wil je alle transacties van “${name}” voortaan als “${e.target.value}” indelen?\n\nOK = regel maken voor alle (ook toekomstige) transacties\nAnnuleren = alleen deze transactie`);
-    try {
-      const r = await api(`api/transactions/${tr.dataset.id}`, json("PATCH", { category: e.target.value, make_rule: makeRule }));
-      toast(makeRule ? `Regel gemaakt · ${r.changed} transacties ingedeeld als ${e.target.value}` : "Categorie aangepast");
-      renderTransactions();
-    } catch (err) { toast(err.message); }
-  }));
+  el("tx-body").querySelectorAll(".cat-select").forEach((sel) => {
+    const original = sel.value;
+    sel.addEventListener("change", async (e) => {
+      const tr = e.target.closest("tr");
+      const choice = await askMoveScope(tr.dataset.id, tr.dataset.name, original, e.target.value);
+      if (!choice) { e.target.value = original; return; }
+      try {
+        const r = await api(`api/transactions/${tr.dataset.id}`, json("PATCH", {
+          category: e.target.value, make_rule: choice.all, pattern: choice.pattern }));
+        toast(choice.all ? `${r.changed} transacties ingedeeld als ${e.target.value} · regel onthouden` : "Categorie aangepast");
+        renderTransactions();
+      } catch (err) { toast(err.message); e.target.value = original; }
+    });
+  });
   el("tx-body").querySelectorAll(".manual").forEach((m) => m.addEventListener("click", async (e) => {
     await api(`api/transactions/${e.target.closest("tr").dataset.id}/reset`, { method: "POST" });
     toast("Teruggezet naar automatische indeling");
     renderTransactions();
   }));
+}
+
+// Vraagt of de nieuwe categorie voor één of voor alle transacties van deze partij geldt.
+// Geeft {all, pattern} terug, of null bij annuleren.
+function askMoveScope(txId, name, from, to) {
+  const dlg = el("move-dialog");
+  const input = el("move-pattern");
+  const count = el("move-count");
+  el("move-name").textContent = name || "Transactie";
+  el("move-from").textContent = from ? ` · ${from}` : "";
+  el("move-to").textContent = to;
+  let timer;
+  const preview = async (pattern) => {
+    try {
+      const r = await api(`api/transactions/${txId}/rule-preview${pattern != null ? `?pattern=${encodeURIComponent(pattern)}` : ""}`);
+      if (pattern == null) input.value = r.pattern;
+      count.textContent = r.count
+        ? `${r.count} transactie${r.count === 1 ? "" : "s"} gevonden${r.examples.length > 1 ? `, o.a. ${r.examples.slice(0, 3).join(", ")}` : ""}`
+        : "Geen transacties gevonden met deze tekst";
+      // Standaardkeuze bij openen: "alle" als er meer transacties van deze partij zijn
+      if (pattern == null && dlg.dataset.touched !== "1")
+        dlg.querySelector(`input[value="${r.count > 1 ? "all" : "one"}"]`).checked = true;
+    } catch (_) { count.textContent = ""; }
+  };
+  dlg.dataset.touched = "0";
+  dlg.querySelector('input[value="all"]').checked = true;
+  input.value = "";
+  count.textContent = "Zoeken…";
+  input.oninput = () => {
+    dlg.dataset.touched = "1";
+    dlg.querySelector('input[value="all"]').checked = true;
+    clearTimeout(timer);
+    timer = setTimeout(() => preview(input.value.trim()), 200);
+  };
+  input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); dlg.close("ok"); } };
+  dlg.querySelectorAll('input[name="scope"]').forEach((r) => (r.onchange = () => (dlg.dataset.touched = "1")));
+  dlg.returnValue = "";
+  preview(null);
+  dlg.showModal();
+  return new Promise((resolve) => {
+    dlg.onclose = () => {
+      if (dlg.returnValue !== "ok") return resolve(null);
+      const all = dlg.querySelector('input[value="all"]').checked && input.value.trim().length > 0;
+      resolve({ all, pattern: all ? input.value.trim() : null });
+    };
+  });
 }
 
 function toggleSelected(tr, on) {

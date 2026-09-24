@@ -609,6 +609,49 @@ def transactions():
     return jsonify([dict(r) for r in rows])
 
 
+# Zelfde zoektekst als categorize(): naam + tegenrekening + mededelingen
+HAYSTACK_SQL = ("(' ' || lower(COALESCE(name,'')) || ' ' || lower(COALESCE(counter_account,'')) || ' ' "
+                "|| lower(COALESCE(description,'')) || ' ')")
+
+
+def suggest_pattern(name):
+    """'Winkelnaam 1234 PLAATS NLD' -> 'winkelnaam', 'Webwinkel via Betaalprovider' -> 'webwinkel'."""
+    words = re.split(r"\s+", (name or "").strip().lower())
+    if " via " in f" {' '.join(words)} ":
+        words = words[:words.index("via")]
+    kept = []
+    for w in words:
+        if any(ch.isdigit() for ch in w):
+            break
+        kept.append(w)
+    pattern = " ".join(kept) or " ".join(words)
+    pattern = re.sub(r"\s+(nld|nl)$", "", pattern).strip()
+    return pattern if len(pattern) >= 3 else (name or "").strip().lower()
+
+
+def matching_ids(conn, pattern, is_debit):
+    sign = "amount < 0" if is_debit else "amount >= 0"
+    return [r[0] for r in conn.execute(
+        f"SELECT id FROM transactions WHERE instr({HAYSTACK_SQL}, ?) > 0 AND {sign}",
+        (pattern.lower(),))]
+
+
+@app.route("/api/transactions/<int:tx_id>/rule-preview")
+@requires_auth
+def rule_preview(tx_id):
+    """Hoeveel transacties zouden meeverhuizen met een regel op dit patroon?"""
+    conn = db()
+    tx = conn.execute("SELECT name, amount FROM transactions WHERE id=?", (tx_id,)).fetchone()
+    if not tx:
+        return jsonify(error="Transactie niet gevonden."), 404
+    pattern = (request.args.get("pattern") or suggest_pattern(tx["name"])).strip().lower()
+    ids = matching_ids(conn, pattern, tx["amount"] < 0) if pattern else []
+    examples = [r[0] for r in conn.execute(
+        f"SELECT DISTINCT name FROM transactions WHERE id IN ({','.join('?' * len(ids))}) LIMIT 5",
+        ids)] if ids else []
+    return jsonify(pattern=pattern, count=len(ids), examples=examples)
+
+
 @app.route("/api/transactions/<int:tx_id>", methods=["PATCH"])
 @requires_auth
 def update_transaction(tx_id):
@@ -622,19 +665,24 @@ def update_transaction(tx_id):
         return jsonify(error="Transactie niet gevonden."), 404
     conn.execute("UPDATE transactions SET category=?, manual=1 WHERE id=?", (category, tx_id))
     changed = 1
-    if data.get("make_rule") and tx["name"]:
-        pattern = tx["name"].strip().lower()
-        direction = "af" if tx["amount"] < 0 else "bij"
+    pattern = (data.get("pattern") or "").strip().lower()
+    if data.get("make_rule") and pattern:
+        is_debit = tx["amount"] < 0
+        direction = "af" if is_debit else "bij"
         conn.execute("DELETE FROM rules WHERE user_defined=1 AND pattern=? AND direction=?",
                      (pattern, direction))
         conn.execute(
             "INSERT INTO rules(pattern, category, direction, user_defined) VALUES (?,?,?,1)",
             (pattern, category, direction))
+        # Alle overeenkomende transacties gaan mee, ook eerder handmatig ingedeelde
+        ids = matching_ids(conn, pattern, is_debit)
+        ph = ",".join("?" * len(ids))
+        conn.execute(f"UPDATE transactions SET manual=0 WHERE id IN ({ph})", ids)
         conn.commit()
         recategorize_all(conn)
         changed = conn.execute(
-            "SELECT COUNT(*) FROM transactions WHERE category=? AND lower(name)=?",
-            (category, pattern)).fetchone()[0]
+            f"SELECT COUNT(*) FROM transactions WHERE category=? AND id IN ({ph})",
+            [category] + ids).fetchone()[0]
     conn.commit()
     return jsonify(ok=True, changed=changed)
 
