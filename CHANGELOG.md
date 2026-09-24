@@ -5,6 +5,11 @@ Versienummers volgen [Semantic Versioning](https://semver.org/lang/nl/): het mid
 
 Updaten in Portainer: open de stack → **Pull and redeploy**. De database wordt bij het opstarten automatisch bijgewerkt en je gegevens blijven bewaard.
 
+## [0.9.1] - 2026-09-24
+
+### Gewijzigd
+- Changelog, codecommentaar en standaardregels zijn algemeen gemaakt: geen voorbeelden meer die van één specifiek huishouden afkomstig zijn. De standaardregels bevatten alleen nog landelijke winkels en diensten; lokale en zeer specifieke namen zijn verwijderd. Mis je er een, voeg hem dan toe als eigen regel.
+
 ## [0.9.0] - 2026-09-24
 
 ### Opgelost
@@ -91,12 +96,13 @@ Updaten in Portainer: open de stack → **Pull and redeploy**. De database wordt
 
 ### Toegevoegd
 - Eerste versie: een Flask- en SQLite-app in Docker die ING CSV-exports inleest.
-- Automatische categorisatie met ruim 500 regels voor Nederlandse winkels en diensten. Retouren verlagen de uitgaven in die categorie, en spaaroverboekingen tellen niet mee.
+- Automatische categorisatie met ruim 450 regels voor Nederlandse winkels en diensten. Retouren verlagen de uitgaven in die categorie, en spaaroverboekingen tellen niet mee.
 - Dashboard met KPI's, een maandgrafiek, uitgaven per categorie met drill-down en de grootste ontvangers.
 - Automatische herkenning van vaste lasten.
 - Regels beheren, en de categorie per transactie aanpassen.
 - Compose-bestanden voor Portainer en een GitHub Actions-workflow die de image naar ghcr.io publiceert.
 
+[0.9.1]: https://github.com/RichrdJ/huishoudboekje/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.6.0...v0.7.0

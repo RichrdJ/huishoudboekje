@@ -18,7 +18,7 @@ from ing_parser import _parse_amount as parse_amount
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 DB_PATH = os.path.join(DATA_DIR, "huishoudboekje.db")
-RULES_VERSION = "4"
+RULES_VERSION = "5"
 PW_METHOD = "pbkdf2:sha256:600000"
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")) as _f:

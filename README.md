@@ -7,7 +7,7 @@ Alles draait lokaal in één container met SQLite. Er gaan geen bankgegevens naa
 ## Functies
 
 - **Upload** van ING CSV-exports (puntkomma- en kommaformaat, Nederlands en Engels). Overlappende periodes geven geen dubbele transacties.
-- **Automatische categorieën**: ruim 500 herkenningsregels voor Nederlandse winkels en diensten (AH, Jumbo, Thuisbezorgd, Netflix, Vattenfall, Zilveren Kruis, bol, Coolblue…). De standaardset is bewust compact:
+- **Automatische categorieën**: ruim 450 herkenningsregels voor Nederlandse winkels en diensten (AH, Jumbo, Thuisbezorgd, Netflix, Vattenfall, Zilveren Kruis, bol, Coolblue…). De standaardset is bewust compact:
   - *Uitgaven*: Boodschappen, Thuisbezorgd en afhaal, Uit eten en horeca, Abonnementen en streaming, Hypotheek, Energie, Water, Verzekeringen, Vervoer, Online winkelen, Kinderen, Overige uitgaven
   - *Inkomsten*: Salaris, Inleg partners, Overige inkomsten
   - *Overboeking (telt niet mee)*: Sparen
