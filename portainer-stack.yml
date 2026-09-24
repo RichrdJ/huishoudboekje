@@ -1,0 +1,21 @@
+# Portainer → Stacks → Add stack → "Web editor": plak dit bestand.
+# Gebruikt de kant-en-klare image die GitHub Actions bouwt (amd64 + arm64).
+# Vul de variabelen in onder "Environment variables" (zie .env.example).
+
+services:
+  huishoudboekje:
+    image: ghcr.io/richrdj/huishoudboekje:latest
+    container_name: huishoudboekje
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    environment:
+      TZ: Europe/Amsterdam
+      PARTNER_IBANS: ${PARTNER_IBANS:-}
+      APP_USER: ${APP_USER:-}
+      APP_PASSWORD: ${APP_PASSWORD:-}
+    volumes:
+      - huishoudboekje-data:/data
+
+volumes:
+  huishoudboekje-data:

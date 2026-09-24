@@ -1,0 +1,26 @@
+# Portainer → Stacks → Add stack → "Repository"
+#   Repository URL:  https://github.com/RichrdJ/huishoudboekje
+#   Compose path:    docker-compose.yml
+# Portainer bouwt de image dan zelf uit deze repository.
+# Vul de variabelen in onder "Environment variables" (zie .env.example).
+
+services:
+  huishoudboekje:
+    build: .
+    image: huishoudboekje:local
+    container_name: huishoudboekje
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    environment:
+      TZ: Europe/Amsterdam
+      # IBAN's van jullie privérekeningen, komma-gescheiden → telt als "Inleg partners"
+      PARTNER_IBANS: ${PARTNER_IBANS:-}
+      # Optioneel inloggen (aanbevolen als de app buiten je thuisnetwerk bereikbaar is)
+      APP_USER: ${APP_USER:-}
+      APP_PASSWORD: ${APP_PASSWORD:-}
+    volumes:
+      - huishoudboekje-data:/data
+
+volumes:
+  huishoudboekje-data:

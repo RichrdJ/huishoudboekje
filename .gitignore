@@ -1,0 +1,10 @@
+# Nooit bankgegevens of de database committen
+data/
+*.db
+*.csv
+!voorbeeld_ing_export.csv
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
