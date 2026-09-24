@@ -11,7 +11,7 @@ services:
     container_name: huishoudboekje
     restart: unless-stopped
     ports:
-      - "8080:8080"   # links de poort op je server, pas aan als 8080 al bezet is
+      - "9393:8080"   # links de poort op je server, pas aan als 9393 al bezet is
     environment:
       TZ: Europe/Amsterdam
     volumes:

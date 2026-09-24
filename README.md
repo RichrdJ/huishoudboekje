@@ -28,7 +28,7 @@ GitHub Actions bouwt bij elke push naar `main` een image: `ghcr.io/richrdj/huish
 
 1. Portainer → **Stacks** → **Add stack** → **Web editor**
 2. Plak de inhoud van [`portainer-stack.yml`](portainer-stack.yml).
-3. **Deploy the stack** → open `http://<server>:8080`
+3. **Deploy the stack** → open `http://<server>:9393`
 
 > Is de repository privé? Maak dan het package op GitHub openbaar (Packages → huishoudboekje → Package settings → Change visibility), of voeg `ghcr.io` toe als registry in Portainer met een GitHub-token met de scope `read:packages`.
 
