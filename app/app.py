@@ -14,6 +14,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from categories import (CATEGORIES, DEFAULT_RULES, FOREIGN_CATEGORY, FOREIGN_COUNTRY_CODES,
                         UNCATEGORIZED)
 from ing_parser import ParseError, parse_ing_csv
+from ing_parser import _parse_amount as parse_amount
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 DB_PATH = os.path.join(DATA_DIR, "huishoudboekje.db")
@@ -74,6 +75,13 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
     """)
+    # Regels kunnen optioneel op een exact bedrag matchen (bijv. een vaste overboeking)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(rules)")}
+    if "amount" not in cols:
+        conn.execute("ALTER TABLE rules ADD COLUMN amount REAL")
+    # name_only=1: alleen zoeken in naam + tegenrekening, niet in de mededelingen
+    if "name_only" not in cols:
+        conn.execute("ALTER TABLE rules ADD COLUMN name_only INTEGER NOT NULL DEFAULT 0")
     # Categorieën aanvullen en standaardregels bijwerken bij een nieuwe versie.
     # Eigen regels (user_defined=1) blijven altijd bewaard.
     conn.executemany(
@@ -269,11 +277,17 @@ def save_password():
 # ---------------------------------------------------------------- categorisatie
 
 def load_rules(conn):
-    rows = conn.execute("SELECT pattern, category, direction, user_defined FROM rules").fetchall()
-    # Eigen regels eerst, daarna het langste (meest specifieke) patroon.
+    rows = conn.execute(
+        "SELECT pattern, category, direction, user_defined, amount, name_only FROM rules").fetchall()
+    # Eigen regels eerst, dan regels met een bedrag, daarna het langste (meest specifieke) patroon.
     return sorted(
-        [(r["pattern"].lower(), r["category"], r["direction"], r["user_defined"]) for r in rows],
-        key=lambda r: (-r[3], -len(r[0])))
+        [(r["pattern"].lower(), r["category"], r["direction"], r["user_defined"], r["amount"],
+          r["name_only"]) for r in rows],
+        key=lambda r: (-r[3], r[4] is None, -len(r[0])))
+
+
+def amount_matches(tx_amount, rule_amount):
+    return rule_amount is None or abs(abs(tx_amount) - rule_amount) < 0.005
 
 
 def _is_foreign_card_payment(tx):
@@ -283,14 +297,16 @@ def _is_foreign_card_payment(tx):
             and (len(name) == 3 or name[-4] == " "))
 
 
+def _haystack(*parts):
+    return " " + re.sub(r"\s+", " ", " ".join(p or "" for p in parts).lower()) + " "
+
+
 def categorize(tx, rules):
-    haystack = " ".join(
-        (tx.get("name") or "", tx.get("counter_account") or "", tx.get("description") or "")
-    ).lower()
-    haystack = " " + re.sub(r"\s+", " ", haystack) + " "
+    name_hay = _haystack(tx.get("name"), tx.get("counter_account"))
+    haystack = _haystack(tx.get("name"), tx.get("counter_account"), tx.get("description"))
     is_debit = tx["amount"] < 0
     foreign = _is_foreign_card_payment(tx)
-    for pattern, category, direction, user_defined in rules:
+    for pattern, category, direction, user_defined, amount, name_only in rules:
         # Buitenlandse pinbetalingen gaan voor op standaardregels, niet op eigen regels
         if foreign and not user_defined:
             return FOREIGN_CATEGORY
@@ -298,7 +314,7 @@ def categorize(tx, rules):
             continue
         if direction == "bij" and is_debit:
             continue
-        if pattern in haystack:
+        if pattern in (name_hay if name_only else haystack) and amount_matches(tx["amount"], amount):
             return category
     if foreign:
         return FOREIGN_CATEGORY
@@ -609,9 +625,8 @@ def transactions():
     return jsonify([dict(r) for r in rows])
 
 
-# Zelfde zoektekst als categorize(): naam + tegenrekening + mededelingen
-HAYSTACK_SQL = ("(' ' || lower(COALESCE(name,'')) || ' ' || lower(COALESCE(counter_account,'')) || ' ' "
-                "|| lower(COALESCE(description,'')) || ' ')")
+# Zelfde zoektekst als een name_only-regel in categorize(): naam + tegenrekening
+NAME_HAYSTACK_SQL = "(' ' || lower(COALESCE(name,'')) || ' ' || lower(COALESCE(counter_account,'')) || ' ')"
 
 
 def suggest_pattern(name):
@@ -629,11 +644,14 @@ def suggest_pattern(name):
     return pattern if len(pattern) >= 3 else (name or "").strip().lower()
 
 
-def matching_ids(conn, pattern, is_debit):
+def matching_ids(conn, pattern, is_debit, amount=None):
     sign = "amount < 0" if is_debit else "amount >= 0"
-    return [r[0] for r in conn.execute(
-        f"SELECT id FROM transactions WHERE instr({HAYSTACK_SQL}, ?) > 0 AND {sign}",
-        (pattern.lower(),))]
+    sql = f"SELECT id FROM transactions WHERE instr({NAME_HAYSTACK_SQL}, ?) > 0 AND {sign}"
+    params = [pattern.lower()]
+    if amount is not None:
+        sql += " AND abs(abs(amount) - ?) < 0.005"
+        params.append(amount)
+    return [r[0] for r in conn.execute(sql, params)]
 
 
 @app.route("/api/transactions/<int:tx_id>/rule-preview")
@@ -645,11 +663,14 @@ def rule_preview(tx_id):
     if not tx:
         return jsonify(error="Transactie niet gevonden."), 404
     pattern = (request.args.get("pattern") or suggest_pattern(tx["name"])).strip().lower()
-    ids = matching_ids(conn, pattern, tx["amount"] < 0) if pattern else []
+    is_debit = tx["amount"] < 0
+    ids = matching_ids(conn, pattern, is_debit) if pattern else []
+    same = matching_ids(conn, pattern, is_debit, abs(tx["amount"])) if pattern else []
     examples = [r[0] for r in conn.execute(
         f"SELECT DISTINCT name FROM transactions WHERE id IN ({','.join('?' * len(ids))}) LIMIT 5",
         ids)] if ids else []
-    return jsonify(pattern=pattern, count=len(ids), examples=examples)
+    return jsonify(pattern=pattern, count=len(ids), examples=examples,
+                   amount=round(abs(tx["amount"]), 2), count_same_amount=len(same))
 
 
 @app.route("/api/transactions/<int:tx_id>", methods=["PATCH"])
@@ -669,13 +690,15 @@ def update_transaction(tx_id):
     if data.get("make_rule") and pattern:
         is_debit = tx["amount"] < 0
         direction = "af" if is_debit else "bij"
-        conn.execute("DELETE FROM rules WHERE user_defined=1 AND pattern=? AND direction=?",
-                     (pattern, direction))
+        amount = round(abs(tx["amount"]), 2) if data.get("same_amount") else None
+        conn.execute("DELETE FROM rules WHERE user_defined=1 AND pattern=? AND direction=? "
+                     "AND amount IS ? AND name_only=1", (pattern, direction, amount))
         conn.execute(
-            "INSERT INTO rules(pattern, category, direction, user_defined) VALUES (?,?,?,1)",
-            (pattern, category, direction))
-        # Alle overeenkomende transacties gaan mee, ook eerder handmatig ingedeelde
-        ids = matching_ids(conn, pattern, is_debit)
+            "INSERT INTO rules(pattern, category, direction, user_defined, amount, name_only) "
+            "VALUES (?,?,?,1,?,1)", (pattern, category, direction, amount))
+        # Met terugwerkende kracht: alle overeenkomende transacties gaan mee,
+        # ook eerder handmatig ingedeelde
+        ids = matching_ids(conn, pattern, is_debit, amount)
         ph = ",".join("?" * len(ids))
         conn.execute(f"UPDATE transactions SET manual=0 WHERE id IN ({ph})", ids)
         conn.commit()
@@ -718,7 +741,7 @@ def reset_transaction(tx_id):
 @requires_auth
 def rules():
     rows = db().execute(
-        "SELECT id, pattern, category, direction, user_defined FROM rules "
+        "SELECT id, pattern, category, direction, user_defined, amount, name_only FROM rules "
         "ORDER BY user_defined DESC, category, pattern").fetchall()
     return jsonify([dict(r) for r in rows])
 
@@ -733,8 +756,14 @@ def add_rule():
     direction = data.get("direction", "")
     if not pattern or category not in category_kinds(conn) or direction not in ("", "af", "bij"):
         return jsonify(error="Ongeldige regel."), 400
-    conn.execute("INSERT INTO rules(pattern, category, direction, user_defined) VALUES (?,?,?,1)",
-                 (pattern, category, direction))
+    amount = None
+    if str(data.get("amount") or "").strip():
+        try:
+            amount = round(abs(parse_amount(str(data["amount"]).replace("€", ""))), 2)
+        except ValueError:
+            return jsonify(error="Ongeldig bedrag."), 400
+    conn.execute("INSERT INTO rules(pattern, category, direction, user_defined, amount) "
+                 "VALUES (?,?,?,1,?)", (pattern, category, direction, amount))
     conn.commit()
     n = recategorize_all(conn)
     return jsonify(ok=True, recategorized=n)

@@ -15,7 +15,12 @@ Alles draait lokaal in één container met SQLite. Er gaan geen bankgegevens naa
 - **Overzicht** per maand, per jaar of over alles: KPI's, vergelijking met het gemiddelde van de 6 maanden ervoor, een maandgrafiek, uitgaven per categorie met drill-down, en de grootste ontvangers.
 - **Vaste lasten** worden automatisch herkend: posten die elke maand met (bijna) hetzelfde bedrag terugkomen.
 - **Zelf indelen**:
-  - Pas de categorie van een transactie aan. De app vraagt dan of dat alleen voor deze transactie geldt, of voor álle transacties van die partij, ook toekomstige. De voorgestelde zoektekst (de winkelnaam zonder filiaalnummer en plaats, zodat alle filialen meegaan) kun je aanpassen, en je ziet direct hoeveel transacties meegaan.
+  - Pas de categorie van een transactie aan. De app vraagt dan waarvoor de wijziging geldt:
+    - **alle transacties van deze partij**
+    - **alleen die met hetzelfde bedrag**, handig voor een vaste overboeking of een abonnement bij een winkel waar je ook gewone aankopen doet
+    - **alleen deze transactie**
+
+    De eerste twee gelden met terugwerkende kracht voor alles wat al geïmporteerd is, en ook voor toekomstige uploads. De voorgestelde zoektekst (de winkelnaam zonder filiaalnummer en plaats, zodat alle filialen meegaan) kun je aanpassen; hij zoekt alleen in de naam, niet in de mededelingen. Je ziet direct hoeveel transacties meegaan.
   - Selecteer meerdere transacties en verplaats ze in één keer.
   - Maak categorieën aan, hernoem ze, verander hun soort (uitgave / inkomen / overboeking) of verwijder ze.
   - Beheer regels in het tabblad *Regels*.

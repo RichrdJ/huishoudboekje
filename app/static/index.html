@@ -207,6 +207,7 @@
             <option value="af">Alleen af</option>
             <option value="bij">Alleen bij</option>
           </select>
+          <input name="amount" placeholder="Bedrag (optioneel)" inputmode="decimal" style="flex:0 1 150px;min-width:120px">
           <select name="category" id="rule-category"></select>
           <button class="btn primary" type="submit">Toevoegen</button>
         </form>
@@ -218,7 +219,7 @@
       <div class="card flush">
         <div class="table-wrap">
           <table class="tx-table">
-            <thead><tr><th>Bevat</th><th>Richting</th><th>Categorie</th><th>Soort</th><th></th></tr></thead>
+            <thead><tr><th>Bevat</th><th>Richting</th><th class="num">Bedrag</th><th>Categorie</th><th>Soort</th><th></th></tr></thead>
             <tbody id="rules-body"></tbody>
           </table>
         </div>
@@ -233,17 +234,23 @@
     <form method="dialog" id="move-form">
       <h3>Categorie wijzigen</h3>
       <p class="move-summary"><b id="move-name"></b><span id="move-from"></span> → <b id="move-to"></b></p>
+      <label class="pattern-row">Herken deze partij aan de tekst
+        <input id="move-pattern" autocomplete="off"></label>
       <label class="opt">
-        <input type="radio" name="scope" value="all" checked>
-        <span><b>Alle transacties van deze partij</b>, ook toekomstige uploads
-          <span class="pattern-row">die <input id="move-pattern" autocomplete="off" aria-label="Zoektekst"> bevatten</span>
-          <span class="sub" id="move-count"></span>
-        </span>
+        <input type="radio" name="scope" value="all">
+        <span><b>Alle transacties van deze partij</b>
+          <span class="sub" id="move-count"></span></span>
+      </label>
+      <label class="opt">
+        <input type="radio" name="scope" value="same">
+        <span><b>Alleen met hetzelfde bedrag (<span id="move-amount"></span>)</b>
+          <span class="sub" id="move-count-same"></span></span>
       </label>
       <label class="opt">
         <input type="radio" name="scope" value="one">
         <span><b>Alleen deze transactie</b></span>
       </label>
+      <p class="sub move-note">De eerste twee keuzes gelden met terugwerkende kracht voor alle geïmporteerde transacties, en ook voor toekomstige uploads.</p>
       <div class="modal-actions">
         <button class="btn ghost" value="cancel" formnovalidate>Annuleren</button>
         <button class="btn primary" value="ok" id="move-ok">Toepassen</button>

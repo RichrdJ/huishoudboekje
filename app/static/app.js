@@ -403,7 +403,7 @@ async function renderTransactions() {
       if (!choice) { e.target.value = original; return; }
       try {
         const r = await api(`api/transactions/${tr.dataset.id}`, json("PATCH", {
-          category: e.target.value, make_rule: choice.all, pattern: choice.pattern }));
+          category: e.target.value, make_rule: choice.all, same_amount: choice.sameAmount, pattern: choice.pattern }));
         toast(choice.all ? `${r.changed} transacties ingedeeld als ${e.target.value} · regel onthouden` : "Categorie aangepast");
         renderTransactions();
       } catch (err) { toast(err.message); e.target.value = original; }
@@ -416,48 +416,50 @@ async function renderTransactions() {
   }));
 }
 
-// Vraagt of de nieuwe categorie voor één of voor alle transacties van deze partij geldt.
-// Geeft {all, pattern} terug, of null bij annuleren.
+// Vraagt of de nieuwe categorie geldt voor alle transacties van deze partij, alleen die met
+// hetzelfde bedrag, of alleen deze. Geeft {all, sameAmount, pattern} terug, of null bij annuleren.
 function askMoveScope(txId, name, from, to) {
   const dlg = el("move-dialog");
   const input = el("move-pattern");
-  const count = el("move-count");
+  const radio = (v) => dlg.querySelector(`input[name="scope"][value="${v}"]`);
+  const plural = (n) => `${n} transactie${n === 1 ? "" : "s"}`;
   el("move-name").textContent = name || "Transactie";
   el("move-from").textContent = from ? ` · ${from}` : "";
   el("move-to").textContent = to;
-  let timer;
+  el("move-count").textContent = el("move-count-same").textContent = "Zoeken…";
+  el("move-amount").textContent = "";
+  input.value = "";
+  let touched = false, timer;
+
   const preview = async (pattern) => {
     try {
       const r = await api(`api/transactions/${txId}/rule-preview${pattern != null ? `?pattern=${encodeURIComponent(pattern)}` : ""}`);
       if (pattern == null) input.value = r.pattern;
-      count.textContent = r.count
-        ? `${r.count} transactie${r.count === 1 ? "" : "s"} gevonden${r.examples.length > 1 ? `, o.a. ${r.examples.slice(0, 3).join(", ")}` : ""}`
+      el("move-amount").textContent = fmt(r.amount);
+      el("move-count").textContent = r.count
+        ? `${plural(r.count)}${r.examples.length > 1 ? `, o.a. ${r.examples.slice(0, 3).join(", ")}` : ""}`
         : "Geen transacties gevonden met deze tekst";
-      // Standaardkeuze bij openen: "alle" als er meer transacties van deze partij zijn
-      if (pattern == null && dlg.dataset.touched !== "1")
-        dlg.querySelector(`input[value="${r.count > 1 ? "all" : "one"}"]`).checked = true;
-    } catch (_) { count.textContent = ""; }
+      el("move-count-same").textContent = `${plural(r.count_same_amount)} van ${fmt(r.amount)}`;
+      if (!touched) radio(r.count > 1 ? "all" : "one").checked = true;
+    } catch (_) { el("move-count").textContent = el("move-count-same").textContent = ""; }
   };
-  dlg.dataset.touched = "0";
-  dlg.querySelector('input[value="all"]').checked = true;
-  input.value = "";
-  count.textContent = "Zoeken…";
   input.oninput = () => {
-    dlg.dataset.touched = "1";
-    dlg.querySelector('input[value="all"]').checked = true;
+    if (radio("one").checked) radio("all").checked = true;
+    touched = true;
     clearTimeout(timer);
     timer = setTimeout(() => preview(input.value.trim()), 200);
   };
   input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); dlg.close("ok"); } };
-  dlg.querySelectorAll('input[name="scope"]').forEach((r) => (r.onchange = () => (dlg.dataset.touched = "1")));
+  dlg.querySelectorAll('input[name="scope"]').forEach((r) => (r.onchange = () => (touched = true)));
   dlg.returnValue = "";
   preview(null);
   dlg.showModal();
   return new Promise((resolve) => {
     dlg.onclose = () => {
       if (dlg.returnValue !== "ok") return resolve(null);
-      const all = dlg.querySelector('input[value="all"]').checked && input.value.trim().length > 0;
-      resolve({ all, pattern: all ? input.value.trim() : null });
+      const pattern = input.value.trim();
+      const scope = pattern ? dlg.querySelector('input[name="scope"]:checked')?.value : "one";
+      resolve({ all: scope !== "one", sameAmount: scope === "same", pattern: scope !== "one" ? pattern : null });
     };
   });
 }
@@ -618,7 +620,8 @@ async function renderRules() {
   const dir = { "": "Af en bij", af: "Af", bij: "Bij" };
   const rows = rules.filter((r) => (!own || r.user_defined) && (!q || r.pattern.includes(q) || r.category.toLowerCase().includes(q)));
   el("rules-body").innerHTML = rows.map((r) => `<tr>
-      <td><code>${esc(r.pattern)}</code></td><td>${dir[r.direction]}</td>
+      <td><code>${esc(r.pattern)}</code>${r.name_only ? ` <span class="sub" style="display:inline">· alleen in naam</span>` : ""}</td><td>${dir[r.direction]}</td>
+      <td class="num">${r.amount != null ? fmt(r.amount) : "—"}</td>
       <td><span class="pill">${esc(r.category)}</span></td>
       <td class="sub">${r.user_defined ? "Eigen regel" : "Standaard"}</td>
       <td class="num"><button class="btn ghost small" data-del="${r.id}">Verwijderen</button></td></tr>`).join("");

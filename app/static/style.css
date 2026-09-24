@@ -324,7 +324,8 @@ main { max-width: 1240px; margin: 0 auto; padding: 24px; }
 }
 .modal .opt:has(input:checked) { border-color: var(--series-1); background: color-mix(in srgb, var(--series-1) 7%, transparent); }
 .modal .opt input[type=radio] { margin-top: 3px; accent-color: var(--series-1); }
-.modal .pattern-row { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; color: var(--text-secondary); flex-wrap: wrap; }
-.modal .pattern-row input { flex: 1; min-width: 140px; min-height: 30px; padding: 4px 8px; }
+.modal .pattern-row { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; color: var(--text-secondary); font-size: 13px; font-weight: 550; }
+.modal .pattern-row input { min-height: 34px; }
+.modal .move-note { font-size: 12px; margin: 6px 2px 0; }
 .modal .sub { display: block; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
