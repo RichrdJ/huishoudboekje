@@ -21,6 +21,8 @@ DB_PATH = os.path.join(DATA_DIR, "huishoudboekje.db")
 RULES_VERSION = "4"
 PW_METHOD = "pbkdf2:sha256:600000"
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")) as _f:
+    APP_VERSION = _f.read().strip()
 
 app = Flask(__name__, static_folder=None)
 app.config.update(MAX_CONTENT_LENGTH=20 * 1024 * 1024, PERMANENT_SESSION_LIFETIME=timedelta(days=30),
@@ -248,7 +250,7 @@ def get_settings():
                                (iban,)).fetchone()
             suggestions.append({"iban": iban, "name": row[0] if row else None, "n": None, "total": None})
     return jsonify(partner_ibans=current, suggestions=suggestions,
-                   username=get_setting(conn, "username"))
+                   username=get_setting(conn, "username"), version=APP_VERSION)
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -390,7 +392,7 @@ def previous_months(conn, period, n=6):
 
 @app.route("/health")
 def health():
-    return jsonify(ok=True)
+    return jsonify(ok=True, version=APP_VERSION)
 
 
 @app.route("/")

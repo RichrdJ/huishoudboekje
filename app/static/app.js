@@ -568,6 +568,7 @@ async function renderCategories() {
 async function renderSettings() {
   const st = await api("api/settings");
   el("cur-user").textContent = st.username;
+  el("app-version").textContent = `v${st.version}`;
   el("pw-user").value = st.username;
   const chosen = new Set(st.partner_ibans);
   el("acc-list").innerHTML = st.suggestions.map((a) => `<li><label>

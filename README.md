@@ -72,3 +72,18 @@ DATA_DIR=./data python app/app.py
 ```
 
 Open daarna http://localhost:8080. Met [`voorbeeld_ing_export.csv`](voorbeeld_ing_export.csv) (fictieve data) kun je de app uitproberen.
+
+## Versies
+
+Alle wijzigingen per versie staan in [CHANGELOG.md](CHANGELOG.md) en onder [Releases](https://github.com/RichrdJ/huishoudboekje/releases). Het versienummer van je installatie zie je onderaan het tabblad *Instellingen*.
+
+- `ghcr.io/richrdj/huishoudboekje:latest` volgt altijd de nieuwste versie.
+- Wil je zelf bepalen wanneer je updatet? Zet dan een vast versienummer in `portainer-stack.yml`, bijvoorbeeld `:0.7.0`.
+
+**Nieuwe versie uitbrengen:** werk `CHANGELOG.md` en `app/VERSION` bij, commit, en push met een tag:
+
+```bash
+git tag -a v0.8.0 -m "v0.8.0" && git push && git push --tags
+```
+
+GitHub Actions bouwt dan de image `:0.8.0` en maakt de release aan met de tekst uit de changelog.
