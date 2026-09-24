@@ -876,13 +876,28 @@ def subscriptions():
 
 @app.route("/api/reset", methods=["POST"])
 @requires_auth
-def reset_all():
-    if (request.get_json(force=True) or {}).get("confirm") != "WISSEN":
-        return jsonify(error="Bevestiging ontbreekt."), 400
+def reset_data():
+    """scope=transactions: alleen transacties wissen.
+    scope=all: terug naar de begintoestand (transacties, eigen categorieën, eigen regels en
+    eigen rekeningen). De login blijft bestaan, zodat de app beveiligd blijft."""
     conn = db()
-    conn.execute("DELETE FROM transactions")
+    data = request.get_json(force=True) or {}
+    scope = data.get("scope")
+    if scope not in ("transactions", "all"):
+        return jsonify(error="Onbekende keuze."), 400
+    if not check_credentials(conn, get_setting(conn, "username"), data.get("password", "")):
+        return jsonify(error="Het wachtwoord klopt niet."), 400
+    n = conn.execute("DELETE FROM transactions").rowcount
+    if scope == "all":
+        conn.execute("DELETE FROM rules")
+        conn.execute("DELETE FROM categories")
+        conn.execute("DELETE FROM meta WHERE key IN ('rules_version', 'partner_ibans')")
     conn.commit()
-    return jsonify(ok=True)
+    if scope == "all":
+        init_db()  # standaardcategorieën en -regels opnieuw aanmaken
+    # Verwijderde gegevens ook echt uit het databasebestand halen
+    conn.execute("VACUUM")
+    return jsonify(ok=True, deleted=n)
 
 
 init_db()

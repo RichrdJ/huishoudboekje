@@ -202,7 +202,6 @@ main { max-width: 1240px; margin: 0 auto; padding: 24px; }
 .rule-form { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .rule-form input { flex: 1; min-width: 200px; }
 #view-rules > .card:first-child { margin-bottom: 16px; }
-.danger-zone { margin-top: 24px; text-align: right; }
 
 /* ---------- empty / drop ---------- */
 .empty { display: grid; place-items: center; min-height: 60vh; }
@@ -329,3 +328,18 @@ main { max-width: 1240px; margin: 0 auto; padding: 24px; }
 .modal .move-note { font-size: 12px; margin: 6px 2px 0; }
 .modal .sub { display: block; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* ---------- gegevens verwijderen ---------- */
+.danger-card { margin-top: 16px; border-color: color-mix(in srgb, var(--critical) 35%, var(--border)); }
+.danger-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+.danger-options > div { border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.danger-options .sub { margin-bottom: 6px; }
+.btn.danger { color: var(--bad-text); border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
+.btn.danger:hover { background: color-mix(in srgb, var(--critical) 10%, transparent); }
+.btn.danger.solid { background: var(--critical); color: #fff; border-color: transparent; }
+.btn.danger.solid:hover { filter: brightness(1.08); background: var(--critical); }
+.modal input[type=password] {
+  font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px; min-height: 34px;
+}
+@media (max-width: 640px) { .danger-options { grid-template-columns: 1fr; } }

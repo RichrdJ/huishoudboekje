@@ -193,6 +193,22 @@
           </form>
         </article>
       </div>
+      <article class="card danger-card">
+        <h3>Gegevens verwijderen</h3>
+        <p class="sub">Je login blijft altijd bewaard, zodat de app beveiligd blijft. Verwijderen kan niet ongedaan worden gemaakt.</p>
+        <div class="danger-options">
+          <div>
+            <b>Alle transacties verwijderen</b>
+            <p class="sub">Categorieën, regels en eigen rekeningen blijven staan. Handig om opnieuw te importeren.</p>
+            <button class="btn danger" type="button" data-reset="transactions">Transacties verwijderen…</button>
+          </div>
+          <div>
+            <b>Alles verwijderen</b>
+            <p class="sub">Transacties, eigen categorieën, eigen regels en eigen rekeningen. De app gaat terug naar de begintoestand.</p>
+            <button class="btn danger" type="button" data-reset="all">Alles verwijderen…</button>
+          </div>
+        </div>
+      </article>
       <p class="hint">Huishoudboekje <span id="app-version"></span> · <a href="https://github.com/RichrdJ/huishoudboekje/blob/main/CHANGELOG.md" target="_blank" rel="noopener">wat is er nieuw?</a></p>
     </section>
 
@@ -225,9 +241,6 @@
           </table>
         </div>
       </div>
-      <div class="danger-zone">
-        <button class="btn ghost small" id="reset-btn">Alle transacties wissen…</button>
-      </div>
     </section>
   </main>
 
@@ -255,6 +268,19 @@
       <div class="modal-actions">
         <button class="btn ghost" value="cancel" formnovalidate>Annuleren</button>
         <button class="btn primary" value="ok" id="move-ok">Toepassen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="reset-dialog" class="modal">
+    <form method="dialog" id="reset-form">
+      <h3 id="reset-title"></h3>
+      <p class="sub" id="reset-text"></p>
+      <label class="pattern-row">Bevestig met je wachtwoord
+        <input type="password" id="reset-password" autocomplete="current-password"></label>
+      <div class="modal-actions">
+        <button class="btn ghost" value="cancel" formnovalidate>Annuleren</button>
+        <button class="btn danger solid" value="ok" id="reset-ok">Definitief verwijderen</button>
       </div>
     </form>
   </dialog>

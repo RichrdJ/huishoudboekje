@@ -5,6 +5,18 @@ Versienummers volgen [Semantic Versioning](https://semver.org/lang/nl/): het mid
 
 Updaten in Portainer: open de stack → **Pull and redeploy**. De database wordt bij het opstarten automatisch bijgewerkt en je gegevens blijven bewaard.
 
+## [0.8.0] - 2026-09-24
+
+### Toegevoegd
+- In *Instellingen* staat een blok **Gegevens verwijderen** met twee keuzes:
+  - **Alle transacties verwijderen**: categorieën, regels en eigen rekeningen blijven staan, handig om opnieuw te importeren.
+  - **Alles verwijderen**: transacties, eigen categorieën, eigen regels en eigen rekeningen. De app gaat terug naar de begintoestand, met de standaardcategorieën en -regels.
+- Verwijderen moet je bevestigen met je wachtwoord. Daarna wordt het databasebestand opgeschoond, zodat verwijderde gegevens er ook echt uit zijn.
+- Je login blijft in beide gevallen bewaard, zodat de app niet terugvalt op admin/admin.
+
+### Gewijzigd
+- De oude knop *Alle transacties wissen…* onderaan het tabblad *Regels* is vervangen door het blok in *Instellingen*.
+
 ## [0.7.0] - 2026-09-24
 
 ### Toegevoegd
@@ -74,6 +86,7 @@ Updaten in Portainer: open de stack → **Pull and redeploy**. De database wordt
 - Regels beheren, en de categorie per transactie aanpassen.
 - Compose-bestanden voor Portainer en een GitHub Actions-workflow die de image naar ghcr.io publiceert.
 
+[0.8.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RichrdJ/huishoudboekje/compare/v0.4.0...v0.5.0

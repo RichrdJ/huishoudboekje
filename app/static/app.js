@@ -135,7 +135,7 @@ function bindUi() {
   el("acc-save").addEventListener("click", saveAccounts);
   el("pw-form").addEventListener("submit", savePassword);
   el("logout-btn").addEventListener("click", async () => { await fetch("logout", { method: "POST" }); location.href = "login"; });
-  el("reset-btn").addEventListener("click", resetAll);
+  document.querySelectorAll("[data-reset]").forEach((b) => b.addEventListener("click", () => resetData(b.dataset.reset)));
 
   // Drag & drop overal op de pagina
   let depth = 0;
@@ -673,12 +673,35 @@ async function addCategory(e) {
   } catch (err) { toast(err.message); }
 }
 
-async function resetAll() {
-  const answer = prompt("Hiermee worden ALLE transacties verwijderd (regels blijven bewaard). Typ WISSEN om te bevestigen.");
-  if (answer !== "WISSEN") return;
-  await api("api/reset", json("POST", { confirm: "WISSEN" }));
-  toast("Alle transacties zijn verwijderd");
-  await loadPeriods();
+const RESET_TEXT = {
+  transactions: ["Alle transacties verwijderen?",
+    "Alle geïmporteerde transacties worden verwijderd. Categorieën, regels en eigen rekeningen blijven staan."],
+  all: ["Alles verwijderen?",
+    "Alle transacties, eigen categorieën, eigen regels en eigen rekeningen worden verwijderd. De standaardcategorieën en -regels komen terug. Je login blijft bestaan."],
+};
+
+function resetData(scope) {
+  const dlg = el("reset-dialog");
+  const pw = el("reset-password");
+  [el("reset-title").textContent, el("reset-text").textContent] = RESET_TEXT[scope];
+  pw.value = "";
+  dlg.returnValue = "";
+  pw.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); dlg.close("ok"); } };
+  dlg.onclose = async () => {
+    if (dlg.returnValue !== "ok") return;
+    try {
+      const r = await api("api/reset", json("POST", { scope, password: pw.value }));
+      toast(scope === "all" ? `Alles verwijderd (${r.deleted} transacties)` : `${r.deleted} transacties verwijderd`, 5000);
+      state.selected.clear();
+      state.selectedCat = null;
+      await loadCategories();
+      await loadPeriods();
+      await refresh();
+    } catch (err) { toast(err.message, 5000); }
+    pw.value = "";
+  };
+  dlg.showModal();
+  pw.focus();
 }
 
 init().catch((e) => toast(e.message, 8000));
