@@ -1,11 +1,15 @@
 import os
+import secrets
+from datetime import timedelta
 import re
 import sqlite3
 import statistics
 from collections import defaultdict
 from functools import wraps
+from urllib.parse import quote
 
-from flask import Flask, Response, g, jsonify, request, send_from_directory
+from flask import Flask, g, jsonify, redirect, request, send_from_directory, session
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from categories import (CATEGORIES, DEFAULT_RULES, FOREIGN_CATEGORY, FOREIGN_COUNTRY_CODES,
                         UNCATEGORIZED)
@@ -13,16 +17,13 @@ from ing_parser import ParseError, parse_ing_csv
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 DB_PATH = os.path.join(DATA_DIR, "huishoudboekje.db")
-APP_USER = os.environ.get("APP_USER", "")
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
-# Eigen rekeningen (bijv. de privérekeningen van beide partners), komma-gescheiden.
-# Stortingen hiervandaan tellen als "Inleg partners", terugboekingen verlagen de inleg.
-PARTNER_IBANS = [x.strip().lower() for x in os.environ.get("PARTNER_IBANS", "").split(",") if x.strip()]
 RULES_VERSION = "3"
+PW_METHOD = "pbkdf2:sha256:600000"
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 app = Flask(__name__, static_folder=None)
-app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
+app.config.update(MAX_CONTENT_LENGTH=20 * 1024 * 1024, PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+                  SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_HTTPONLY=True)
 
 
 # ---------------------------------------------------------------- database
@@ -86,28 +87,183 @@ def init_db():
             DEFAULT_RULES)
         conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('rules_version', ?)",
                      (RULES_VERSION,))
-    # Partnerrekeningen uit de configuratie (user_defined=2 -> hoogste prioriteit)
-    conn.execute("DELETE FROM rules WHERE user_defined=2")
-    conn.executemany(
-        "INSERT INTO rules(pattern, category, direction, user_defined) VALUES (?, 'Inleg partners', '', 2)",
-        [(iban,) for iban in PARTNER_IBANS])
+    secret = get_setting(conn, "secret_key")
+    if not secret:
+        secret = secrets.token_hex(32)
+        set_setting(conn, "secret_key", secret)
+    app.secret_key = secret
+    if not get_setting(conn, "password_hash"):
+        set_setting(conn, "username", DEFAULT_USER)
+        set_setting(conn, "password_hash", generate_password_hash(DEFAULT_PASSWORD, method=PW_METHOD))
+        set_setting(conn, "must_change", "1")
+    apply_partner_rules(conn)
     conn.commit()
     recategorize_all(conn)
     conn.close()
 
 
+# ---------------------------------------------------------------- instellingen
+
+def get_setting(conn, key, default=""):
+    row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+    return row[0] if row else default
+
+
+def set_setting(conn, key, value):
+    conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, value))
+
+
+def normalize_iban(value):
+    return re.sub(r"\s+", "", value or "").upper()
+
+
+def partner_ibans(conn):
+    return [x for x in get_setting(conn, "partner_ibans").split(",") if x]
+
+
+def apply_partner_rules(conn):
+    """Eigen rekeningen worden regels met de hoogste prioriteit (user_defined=2):
+    stortingen tellen als inleg, terugboekingen verlagen de inleg."""
+    conn.execute("DELETE FROM rules WHERE user_defined=2")
+    conn.executemany(
+        "INSERT INTO rules(pattern, category, direction, user_defined) VALUES (?, 'Inleg partners', '', 2)",
+        [(iban.lower(),) for iban in partner_ibans(conn)])
+
+
 # ---------------------------------------------------------------- auth
 
+DEFAULT_USER = "admin"
+DEFAULT_PASSWORD = "admin"
+
+
 def requires_auth(fn):
+    """Iedereen moet inloggen. Zolang het standaardwachtwoord nog actief is,
+    is alleen het scherm om het te wijzigen bereikbaar."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if APP_PASSWORD:
-            auth = request.authorization
-            if not auth or auth.password != APP_PASSWORD or (APP_USER and auth.username != APP_USER):
-                return Response("Inloggen vereist", 401,
-                                {"WWW-Authenticate": 'Basic realm="Huishoudboekje"'})
+        is_api = request.path.startswith("/api/")
+        if not session.get("auth"):
+            return (jsonify(error="Inloggen vereist."), 401) if is_api else redirect("login")
+        if get_setting(db(), "must_change") == "1":
+            return (jsonify(error="Wijzig eerst het standaardwachtwoord."), 403) if is_api \
+                else redirect("login")
         return fn(*args, **kwargs)
     return wrapper
+
+
+def check_credentials(conn, username, password):
+    return (username.strip().lower() == get_setting(conn, "username").lower()
+            and check_password_hash(get_setting(conn, "password_hash"), password))
+
+
+def set_credentials(conn, username, password):
+    username = username.strip()
+    if not username:
+        return "Kies een gebruikersnaam."
+    if len(password) < 8:
+        return "Kies een wachtwoord van minimaal 8 tekens."
+    if password == DEFAULT_PASSWORD or password.lower() == username.lower():
+        return "Kies een sterker wachtwoord."
+    set_setting(conn, "username", username)
+    set_setting(conn, "password_hash", generate_password_hash(password, method=PW_METHOD))
+    set_setting(conn, "must_change", "0")
+    conn.commit()
+    return None
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    conn = db()
+    must_change = get_setting(conn, "must_change") == "1"
+    if request.method == "POST":
+        if request.form.get("action") == "change":
+            if not session.get("auth"):
+                return redirect("login")
+            if request.form.get("password") != request.form.get("password2"):
+                return redirect("login?fout=" + quote("De wachtwoorden zijn niet gelijk."))
+            err = set_credentials(conn, request.form.get("username", ""), request.form.get("password", ""))
+            if err:
+                return redirect("login?fout=" + quote(err))
+            return redirect("./")
+        if check_credentials(conn, request.form.get("username", ""), request.form.get("password", "")):
+            session.clear()
+            session.permanent = True
+            session["auth"] = True
+            return redirect("login" if must_change else "./")
+        return redirect("login?fout=" + quote("Onjuiste gebruikersnaam of wachtwoord."))
+    if session.get("auth") and not must_change:
+        return redirect("./")
+    return send_from_directory(STATIC_DIR, "login.html")
+
+
+@app.route("/api/login-state")
+def login_state():
+    return jsonify(logged_in=bool(session.get("auth")),
+                   must_change=get_setting(db(), "must_change") == "1")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify(ok=True)
+
+
+@app.route("/api/settings")
+@requires_auth
+def get_settings():
+    conn = db()
+    current = partner_ibans(conn)
+    # Voorstellen: rekeningen die regelmatig geld storten via een eigen overboeking
+    suggestions = []
+    for r in conn.execute("""
+            SELECT upper(counter_account) iban, COUNT(*) n, ROUND(SUM(amount),2) total,
+                   MAX(name) name
+            FROM transactions
+            WHERE amount > 0 AND counter_account LIKE 'NL%'
+              AND mutation_type IN ('Online bankieren', 'Overschrijving')
+            GROUP BY upper(counter_account) HAVING COUNT(*) >= 3
+            ORDER BY SUM(amount) DESC LIMIT 8"""):
+        suggestions.append(dict(r))
+    known = {s["iban"] for s in suggestions}
+    for iban in current:
+        if iban not in known:
+            row = conn.execute("SELECT MAX(name) FROM transactions WHERE upper(counter_account)=?",
+                               (iban,)).fetchone()
+            suggestions.append({"iban": iban, "name": row[0] if row else None, "n": None, "total": None})
+    return jsonify(partner_ibans=current, suggestions=suggestions,
+                   username=get_setting(conn, "username"))
+
+
+@app.route("/api/settings", methods=["POST"])
+@requires_auth
+def save_settings():
+    conn = db()
+    data = request.get_json(force=True)
+    ibans = []
+    for raw in data.get("partner_ibans", []):
+        iban = normalize_iban(raw)
+        if not re.fullmatch(r"[A-Z]{2}\d{2}[A-Z0-9]{8,30}", iban):
+            return jsonify(error=f"“{raw}” is geen geldig rekeningnummer."), 400
+        if iban not in ibans:
+            ibans.append(iban)
+    set_setting(conn, "partner_ibans", ",".join(ibans))
+    apply_partner_rules(conn)
+    conn.commit()
+    n = recategorize_all(conn)
+    return jsonify(ok=True, partner_ibans=ibans, recategorized=n)
+
+
+@app.route("/api/settings/password", methods=["POST"])
+@requires_auth
+def save_password():
+    conn = db()
+    data = request.get_json(force=True)
+    if not check_credentials(conn, get_setting(conn, "username"), data.get("current", "")):
+        return jsonify(error="Het huidige wachtwoord klopt niet."), 400
+    err = set_credentials(conn, data.get("username") or get_setting(conn, "username"), data.get("new", ""))
+    if err:
+        return jsonify(error=err), 400
+    return jsonify(ok=True, username=get_setting(conn, "username"))
 
 
 # ---------------------------------------------------------------- categorisatie
@@ -214,7 +370,6 @@ def index():
 
 
 @app.route("/static/<path:filename>")
-@requires_auth
 def static_files(filename):
     return send_from_directory(STATIC_DIR, filename)
 

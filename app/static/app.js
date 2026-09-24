@@ -22,6 +22,7 @@ const periodLabel = (p) => {
 
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
+  if (res.status === 401 || res.status === 403) { location.href = "login"; throw new Error("Inloggen vereist"); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Fout ${res.status}`);
   return data;
@@ -90,6 +91,7 @@ async function refresh() {
   if (state.view === "subscriptions") await renderSubscriptions();
   if (state.view === "categories") await renderCategories();
   if (state.view === "rules") await renderRules();
+  if (state.view === "settings") await renderSettings();
 }
 
 function setView(view) {
@@ -125,6 +127,11 @@ function bindUi() {
   });
   el("bulk-clear").addEventListener("click", () => { state.selected.clear(); renderTransactions(); });
   el("bulk-apply").addEventListener("click", bulkApply);
+  el("acc-add-btn").addEventListener("click", addAccount);
+  el("acc-add").addEventListener("keydown", (e) => { if (e.key === "Enter") addAccount(); });
+  el("acc-save").addEventListener("click", saveAccounts);
+  el("pw-form").addEventListener("submit", savePassword);
+  el("logout-btn").addEventListener("click", async () => { await fetch("logout", { method: "POST" }); location.href = "login"; });
   el("reset-btn").addEventListener("click", resetAll);
 
   // Drag & drop overal op de pagina
@@ -194,6 +201,15 @@ async function renderOverview() {
       <button class="btn small" id="fix-uncat">Nu indelen</button>`;
     notice.classList.remove("hidden");
     el("fix-uncat").onclick = () => { el("tx-category").value = "Ongecategoriseerd"; setView("transactions"); };
+  } else if (!state.settingsChecked) {
+    state.settingsChecked = true;
+    const st = await api("api/settings");
+    if (!st.partner_ibans.length && st.suggestions.length) {
+      notice.innerHTML = `<span>Tip: geef aan welke rekeningen van jullie zelf zijn, zodat stortingen als <b>inleg</b> tellen.</span>
+        <button class="btn small" id="goto-settings">Instellen</button>`;
+      notice.classList.remove("hidden");
+      el("goto-settings").onclick = () => setView("settings");
+    } else notice.classList.add("hidden");
   } else notice.classList.add("hidden");
 
   el("monthly-legend").innerHTML =
@@ -478,6 +494,51 @@ async function renderCategories() {
       };
     });
   });
+}
+
+// ------------------------------------------------------------------ instellingen
+async function renderSettings() {
+  const st = await api("api/settings");
+  el("cur-user").textContent = st.username;
+  el("pw-user").value = st.username;
+  const chosen = new Set(st.partner_ibans);
+  el("acc-list").innerHTML = st.suggestions.map((a) => `<li><label>
+      <input type="checkbox" value="${esc(a.iban)}" ${chosen.has(a.iban) ? "checked" : ""}>
+      <span><b>${esc(a.name || "Onbekend")}</b><span class="iban">${esc(a.iban)}</span></span>
+      <span class="r">${a.n != null ? `${a.n}× gestort<br>${fmt0(a.total)}` : ""}</span>
+    </label></li>`).join("") || `<li class="sub">Upload eerst een export; dan verschijnen hier de rekeningen die geld storten.</li>`;
+}
+
+function addAccount() {
+  const iban = el("acc-add").value.replace(/\s+/g, "").toUpperCase();
+  if (!iban) return;
+  if (!el("acc-list").querySelector(`input[value="${CSS.escape(iban)}"]`)) {
+    el("acc-list").querySelector(".sub")?.remove();
+    el("acc-list").insertAdjacentHTML("beforeend", `<li><label><input type="checkbox" value="${esc(iban)}" checked>
+      <span><b>Handmatig toegevoegd</b><span class="iban">${esc(iban)}</span></span><span class="r"></span></label></li>`);
+  }
+  el("acc-add").value = "";
+}
+
+async function saveAccounts() {
+  const ibans = [...el("acc-list").querySelectorAll("input:checked")].map((c) => c.value);
+  try {
+    const r = await api("api/settings", json("POST", { partner_ibans: ibans }));
+    toast(`Opgeslagen · ${r.partner_ibans.length} eigen rekening${r.partner_ibans.length === 1 ? "" : "en"}, transacties opnieuw ingedeeld`);
+    renderSettings();
+  } catch (err) { toast(err.message, 5000); }
+}
+
+async function savePassword(e) {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  if (f.new !== f.new2) { toast("De nieuwe wachtwoorden zijn niet gelijk."); return; }
+  try {
+    await api("api/settings/password", json("POST", { username: f.username, current: f.current, new: f.new }));
+    toast("Login bijgewerkt");
+    e.target.reset();
+    renderSettings();
+  } catch (err) { toast(err.message, 5000); }
 }
 
 // ------------------------------------------------------------------ vaste lasten

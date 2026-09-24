@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inloggen · Huishoudboekje</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><rect x='7' y='17' width='4' height='8' rx='1' fill='white'/><rect x='14' y='11' width='4' height='14' rx='1' fill='white'/><rect x='21' y='7' width='4' height='18' rx='1' fill='white'/></svg>">
+  <link rel="stylesheet" href="static/style.css">
+</head>
+<body class="login-page">
+  <main class="login-box">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--series-1)"/><rect x="7" y="17" width="4" height="8" rx="1" fill="#fff"/><rect x="14" y="11" width="4" height="14" rx="1" fill="#fff"/><rect x="21" y="7" width="4" height="18" rx="1" fill="#fff"/></svg>
+      <span>Huishoudboekje</span>
+    </div>
+
+    <div class="login-error" id="error" hidden></div>
+
+    <form method="post" action="login" id="login-form" hidden>
+      <h2>Inloggen</h2>
+      <label>Gebruikersnaam<input name="username" autocomplete="username" required autofocus></label>
+      <label>Wachtwoord<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" type="submit">Inloggen</button>
+      <p class="sub" id="first-run" hidden>Eerste keer? Log in met <b>admin</b> / <b>admin</b>. Daarna kies je direct je eigen gegevens.</p>
+    </form>
+
+    <form method="post" action="login" id="change-form" hidden>
+      <input type="hidden" name="action" value="change">
+      <h2>Kies je eigen login</h2>
+      <p class="sub">Je gebruikt nog het standaardwachtwoord. Kies een eigen gebruikersnaam en een wachtwoord van minimaal 8 tekens.</p>
+      <label>Gebruikersnaam<input name="username" autocomplete="username" required autofocus></label>
+      <label>Nieuw wachtwoord<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label>Herhaal wachtwoord<input name="password2" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="btn primary" type="submit">Opslaan en verder</button>
+    </form>
+  </main>
+  <script>
+    (async () => {
+      const params = new URLSearchParams(location.search);
+      if (params.get("fout")) {
+        const e = document.getElementById("error");
+        e.textContent = params.get("fout");
+        e.hidden = false;
+      }
+      let state = { logged_in: false, must_change: false };
+      try { state = await (await fetch("api/login-state")).json(); } catch (_) { /* toon loginformulier */ }
+      const change = state.logged_in && state.must_change;
+      document.getElementById("change-form").hidden = !change;
+      document.getElementById("login-form").hidden = change;
+      document.getElementById("first-run").hidden = !state.must_change;
+    })();
+  </script>
+</body>
+</html>

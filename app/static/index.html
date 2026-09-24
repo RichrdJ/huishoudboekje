@@ -19,6 +19,7 @@
       <button class="tab" data-view="subscriptions">Vaste lasten</button>
       <button class="tab" data-view="categories">Categorieën</button>
       <button class="tab" data-view="rules">Regels</button>
+      <button class="tab" data-view="settings">Instellingen</button>
     </nav>
     <div class="actions">
       <label class="select-wrap">
@@ -164,6 +165,34 @@
         </div>
       </div>
       <p class="hint">Een categorie hernoemen verplaatst ook alle transacties en regels mee. Bij verwijderen kies je waar de transacties naartoe gaan.</p>
+    </section>
+
+    <!-- Instellingen -->
+    <section id="view-settings" class="view hidden">
+      <div class="settings-grid">
+        <article class="card">
+          <h3>Eigen rekeningen</h3>
+          <p class="sub">Vink de privérekeningen aan waarmee jullie geld op deze rekening storten. Die stortingen tellen als <b>Inleg partners</b>, en terugboekingen naar die rekeningen verlagen de inleg. Hieronder staan rekeningen die vaak geld overmaken.</p>
+          <ul class="acc-list" id="acc-list"></ul>
+          <div class="rule-form">
+            <input id="acc-add" placeholder="Ander rekeningnummer, bijv. NL00INGB0001234567">
+            <button class="btn" id="acc-add-btn" type="button">Toevoegen</button>
+          </div>
+          <div class="rule-form"><button class="btn primary" id="acc-save" type="button">Opslaan</button></div>
+        </article>
+        <article class="card">
+          <h3>Inloggen</h3>
+          <p class="sub">Ingelogd als <b id="cur-user"></b>. Wijzig hier je gebruikersnaam of wachtwoord.</p>
+          <form class="stack-form" id="pw-form">
+            <label>Gebruikersnaam<input name="username" id="pw-user" autocomplete="username" required></label>
+            <label>Huidig wachtwoord<input name="current" type="password" autocomplete="current-password" required></label>
+            <label>Nieuw wachtwoord<input name="new" type="password" autocomplete="new-password" minlength="8" required></label>
+            <label>Herhaal nieuw wachtwoord<input name="new2" type="password" autocomplete="new-password" minlength="8" required></label>
+            <div style="display:flex;gap:8px"><button class="btn primary" type="submit">Opslaan</button>
+              <button class="btn ghost" type="button" id="logout-btn">Uitloggen</button></div>
+          </form>
+        </article>
+      </div>
     </section>
 
     <!-- Regels -->

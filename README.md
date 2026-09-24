@@ -2,7 +2,7 @@
 
 Een klein, zelf-gehost huishoudboekje voor de ING-rekening. Upload elke maand de CSV-export uit de ING app. De app deelt alle transacties automatisch in categorieën in en geeft een overzicht van inkomsten, uitgaven, vaste lasten en trends.
 
-Alles draait lokaal in één container met SQLite. Er gaan geen bankgegevens naar externe diensten.
+Alles draait lokaal in één container met SQLite. Er gaan geen bankgegevens naar externe diensten. Alle instellingen doe je in de app zelf; in Portainer hoef je niets in te vullen.
 
 ## Functies
 
@@ -11,7 +11,7 @@ Alles draait lokaal in één container met SQLite. Er gaan geen bankgegevens naa
   - Pinbetalingen in het buitenland → *Vakantie & reizen*
   - Terugbetalingen (bijv. een retour bij bol) verlagen de uitgaven in die categorie
   - Overboekingen van en naar de spaarrekening tellen niet als inkomen of uitgave
-  - Stortingen vanaf jullie privérekeningen (`PARTNER_IBANS`) → *Inleg partners*
+  - Stortingen vanaf jullie privérekeningen → *Inleg partners*. Die rekeningen vink je aan in *Instellingen*; de app stelt ze zelf voor.
 - **Overzicht** per maand, per jaar of over alles: KPI's, vergelijking met het gemiddelde van de 6 maanden ervoor, een maandgrafiek, uitgaven per categorie met drill-down, en de grootste ontvangers.
 - **Vaste lasten** worden automatisch herkend: posten die elke maand met (bijna) hetzelfde bedrag terugkomen.
 - **Zelf indelen**:
@@ -28,8 +28,7 @@ GitHub Actions bouwt bij elke push naar `main` een image: `ghcr.io/richrdj/huish
 
 1. Portainer → **Stacks** → **Add stack** → **Web editor**
 2. Plak de inhoud van [`portainer-stack.yml`](portainer-stack.yml).
-3. Vul onder **Environment variables** de waarden in (zie [`.env.example`](.env.example)).
-4. **Deploy the stack** → open `http://<server>:8080`
+3. **Deploy the stack** → open `http://<server>:8080`
 
 > Is de repository privé? Maak dan het package op GitHub openbaar (Packages → huishoudboekje → Package settings → Change visibility), of voeg `ghcr.io` toe als registry in Portainer met een GitHub-token met de scope `read:packages`.
 
@@ -38,15 +37,15 @@ GitHub Actions bouwt bij elke push naar `main` een image: `ghcr.io/richrdj/huish
 1. Portainer → **Stacks** → **Add stack** → **Repository**
 2. Repository URL: `https://github.com/RichrdJ/huishoudboekje`, Compose path: `docker-compose.yml`
 3. Bij een privé-repo: zet *Authentication* aan en gebruik een GitHub-token.
-4. Vul de environment variables in en deploy. Met *GitOps updates* haalt Portainer nieuwe versies automatisch op.
+4. Deploy. Met *GitOps updates* haalt Portainer nieuwe versies automatisch op.
 
-### Instellingen
+### Eerste keer inloggen
 
-| Variabele | Omschrijving |
-|---|---|
-| `HOST_PORT` | Poort op de server (standaard `8080`) |
-| `PARTNER_IBANS` | IBAN's van de privérekeningen, komma-gescheiden. Stortingen hiervandaan tellen als *Inleg partners*, terugboekingen verlagen de inleg. |
-| `APP_USER` / `APP_PASSWORD` | Optioneel inloggen (HTTP basic auth). Aanbevolen als de app buiten je thuisnetwerk bereikbaar is. Gebruik dan ook HTTPS via een reverse proxy. |
+Log in met **admin** / **admin**. Je moet dan direct een eigen gebruikersnaam en wachtwoord kiezen; tot die tijd is verder niets bereikbaar. Wijzigen kan later onder **Instellingen**.
+
+Vink daarna onder **Instellingen → Eigen rekeningen** jullie privérekeningen aan, zodat stortingen als inleg tellen.
+
+Wil je de app buiten je thuisnetwerk bereikbaar maken? Zet er dan een reverse proxy met HTTPS voor, bijvoorbeeld Nginx Proxy Manager, Traefik of Caddy.
 
 De database staat in het volume `huishoudboekje-data` (`/data/huishoudboekje.db`). Neem dat volume mee in je back-ups.
 
