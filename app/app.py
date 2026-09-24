@@ -1,6 +1,6 @@
 import os
 import secrets
-from datetime import timedelta
+from datetime import date, timedelta
 import re
 import sqlite3
 import statistics
@@ -354,6 +354,11 @@ def period_filter(period):
     return "1=1", []
 
 
+def current_month():
+    """De lopende kalendermaand; die is nog niet compleet."""
+    return date.today().strftime("%Y-%m")
+
+
 def month_count(conn, period):
     where, params = period_filter(period)
     n = conn.execute(
@@ -427,7 +432,7 @@ def periods():
     months = [r[0] for r in conn.execute(
         "SELECT DISTINCT substr(date,1,7) FROM transactions ORDER BY 1 DESC")]
     years = sorted({m[:4] for m in months}, reverse=True)
-    return jsonify(months=months, years=years)
+    return jsonify(months=months, years=years, current_month=current_month())
 
 
 PROTECTED_CATEGORIES = {UNCATEGORIZED}
@@ -579,9 +584,32 @@ def summary():
         f"SELECT COUNT(*) FROM transactions WHERE {where} AND category=?",
         params + [UNCATEGORIZED]).fetchone()[0]
 
+    # Gemiddelde per maand, alleen over volledige maanden (de lopende maand telt niet mee)
+    cur = current_month()
+    full_months = conn.execute(
+        f"SELECT COUNT(DISTINCT substr(date,1,7)) FROM transactions WHERE {where} "
+        "AND substr(date,1,7) < ?", params + [cur]).fetchone()[0]
+    avg_where, avg_params = (f"{where} AND substr(date,1,7) < ?", params + [cur]) if full_months \
+        else (where, params)
+    n_avg = full_months or month_count(conn, period)
+    avg_by_cat = {r["category"]: r["total"] / n_avg for r in conn.execute(
+        f"SELECT category, SUM(amount) total FROM transactions WHERE {avg_where} GROUP BY category",
+        avg_params)}
+    avg_income = sum(v for c, v in avg_by_cat.items() if kinds.get(c) == "inkomen")
+    avg_expenses = -sum(v for c, v in avg_by_cat.items() if kinds.get(c, "uitgave") == "uitgave")
+    avg_saved = -sum(v for c, v in avg_by_cat.items() if kinds.get(c) == "overboeking")
+    for c in expense_cats:
+        c["per_month"] = round(-avg_by_cat.get(c["category"], 0.0), 2)
+    for c in income_cats:
+        c["per_month"] = round(avg_by_cat.get(c["category"], 0.0), 2)
+
     return jsonify(
         period=period,
         months_in_period=month_count(conn, period),
+        avg=dict(months=n_avg, partial_excluded=bool(full_months) and full_months < month_count(conn, period),
+                 income=round(avg_income, 2), expenses=round(avg_expenses, 2),
+                 net=round(avg_income - avg_expenses, 2), saved=round(avg_saved, 2)),
+        is_current_month=period == cur,
         income=round(income, 2), expenses=round(expenses, 2), saved=round(saved, 2),
         net=round(income - expenses, 2),
         prev_income=round(prev_income, 2) if prev else None,

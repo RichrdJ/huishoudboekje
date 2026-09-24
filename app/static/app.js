@@ -69,14 +69,17 @@ async function loadCategories() {
 }
 
 async function loadPeriods() {
-  const { months, years } = await api("api/periods");
+  const { months, years, current_month: cur } = await api("api/periods");
   const sel = el("period");
   const prev = state.period;
   sel.innerHTML =
-    `<optgroup label="Maand">${months.map((m) => `<option value="${m}">${periodLabel(m)}</option>`).join("")}</optgroup>` +
+    `<optgroup label="Maand">${months.map((m) => `<option value="${m}">${periodLabel(m)}${m === cur ? " (lopend)" : ""}</option>`).join("")}</optgroup>` +
     `<optgroup label="Jaar">${years.map((y) => `<option value="${y}">Heel ${y}</option>`).join("")}</optgroup>` +
     `<option value="all">Alles</option>`;
-  state.period = prev && [...months, ...years, "all"].includes(prev) ? prev : (months[0] || "all");
+  // Standaard: de laatste volledige maand, niet de lopende
+  state.currentMonth = cur;
+  const lastFull = months.find((m) => m < cur) || months[0] || "all";
+  state.period = prev && [...months, ...years, "all"].includes(prev) ? prev : lastFull;
   sel.value = state.period;
   const empty = months.length === 0;
   el("empty").classList.toggle("hidden", !empty);
@@ -181,18 +184,24 @@ async function renderOverview() {
   const s = await api(`api/summary?period=${encodeURIComponent(state.period)}`);
   state.lastSummary = s;
   const avgLabel = `gem. ${s.prev_months} mnd ervoor`;
-  const perMonth = s.months_in_period > 1;
-  const savingsRate = s.income > 0 ? ((s.income - s.expenses) / s.income) * 100 : null;
+  // Meerdere maanden: gemiddelde per (volledige) maand voorop, totaal als toelichting
+  const multi = s.months_in_period > 1;
+  const v = multi ? s.avg : s;
+  const perLabel = multi ? " per maand" : "";
+  const totalNote = (total) => multi
+    ? `Totaal ${fmt0(total)} · gem. over ${s.avg.months} ${s.avg.months === 1 ? "maand" : "volle maanden"}` : "";
+  const savingsRate = v.income > 0 ? ((v.income - v.expenses) / v.income) * 100 : null;
 
   el("kpis").innerHTML = [
-    { label: "Inkomsten", value: fmt0(s.income), delta: deltaHtml(s.income, s.prev_income, true, avgLabel),
-      extra: perMonth ? `${fmt0(s.income / s.months_in_period)} per maand` : "" },
-    { label: "Uitgaven", value: fmt0(s.expenses), delta: deltaHtml(s.expenses, s.prev_expenses, false, avgLabel),
-      extra: perMonth ? `${fmt0(s.expenses / s.months_in_period)} per maand` : "" },
-    { label: "Over (inkomsten − uitgaven)", value: fmt0(s.net),
+    { label: `Inkomsten${perLabel}`, value: fmt0(v.income), delta: deltaHtml(s.income, s.prev_income, true, avgLabel),
+      extra: totalNote(s.income) },
+    { label: `Uitgaven${perLabel}`, value: fmt0(v.expenses), delta: deltaHtml(s.expenses, s.prev_expenses, false, avgLabel),
+      extra: totalNote(s.expenses) },
+    { label: `Over${perLabel} (inkomsten − uitgaven)`, value: fmt0(v.net),
       extra: (savingsRate != null ? `${savingsRate.toFixed(0)}% van de inkomsten` : "") +
-        (s.saved > 0.5 ? ` · ${fmt0(s.saved)} naar sparen` : s.saved < -0.5 ? ` · ${fmt0(-s.saved)} uit sparen gehaald` : "") },
-    { label: "Saldo", value: s.balance != null ? fmt0(s.balance) : "—", extra: "na laatste transactie in periode" },
+        (v.saved > 0.5 ? ` · ${fmt0(v.saved)} naar sparen` : v.saved < -0.5 ? ` · ${fmt0(-v.saved)} uit sparen gehaald` : "") },
+    { label: "Saldo", value: s.balance != null ? fmt0(s.balance) : "—",
+      extra: s.is_current_month ? "lopende maand, nog niet compleet" : "na laatste transactie in periode" },
   ].map((k) => `<div class="kpi"><div class="label">${k.label}</div><div class="value">${k.value}</div>${k.delta || ""}${k.extra ? `<div class="delta">${k.extra}</div>` : ""}</div>`).join("");
 
   const notice = el("notice");
@@ -269,7 +278,7 @@ function drawMonthly(data) {
   host.querySelectorAll(".hit").forEach((r) => {
     const d = data[+r.dataset.i];
     const net = d.income - d.expenses;
-    const html = `<div class="t">${periodLabel(d.month)}</div>
+    const html = `<div class="t">${periodLabel(d.month)}${d.month === state.currentMonth ? " (lopend)" : ""}</div>
       <div class="row"><span><i class="sw" style="background:var(--series-1)"></i>Inkomsten</span><b>${fmt(d.income)}</b></div>
       <div class="row"><span><i class="sw" style="background:var(--series-2)"></i>Uitgaven</span><b>${fmt(d.expenses)}</b></div>
       <hr><div class="row"><span>Over</span><b>${fmt(net)}</b></div>
@@ -282,17 +291,20 @@ function drawMonthly(data) {
 }
 
 function drawCategoryBars(s) {
-  const cats = s.expense_categories;
-  const max = Math.max(1, ...cats.map((c) => Math.max(c.total, c.avg_prev || 0)));
+  const multi = s.months_in_period > 1;
+  // Bij meerdere maanden: balken en bedragen per maand, totaal in de tooltip
+  const val = (c) => (multi ? c.per_month : c.total);
+  const cats = [...s.expense_categories].sort((a, b) => val(b) - val(a));
+  const max = Math.max(1, ...cats.map((c) => Math.max(val(c), c.avg_prev || 0)));
   const hasAvg = cats.some((c) => c.avg_prev != null);
-  el("cat-sub").textContent = `${periodLabel(s.period)} · klik voor details`;
+  el("cat-sub").textContent = `${multi ? "Gemiddeld per maand · " : ""}${periodLabel(s.period)} · klik voor details`;
   el("cat-bars").innerHTML = cats.length ? cats.map((c) => {
     const pct = s.expenses ? (c.total / s.expenses) * 100 : 0;
     return `<button class="hbar ${state.selectedCat === c.category ? "selected" : ""}" data-cat="${esc(c.category)}">
       <span class="name">${esc(c.category)}</span>
-      <span class="track"><span class="fill" style="width:${(c.total / max) * 100}%"></span>
+      <span class="track"><span class="fill" style="width:${(Math.max(0, val(c)) / max) * 100}%"></span>
         ${c.avg_prev ? `<span class="avg" style="left:calc(${(c.avg_prev / max) * 100}% - 1px)"></span>` : ""}</span>
-      <span class="amt">${fmt0(c.total)}<small>${pct.toFixed(0)}%</small></span>
+      <span class="amt">${fmt0(val(c))}<small>${multi ? `p/m · ${pct.toFixed(0)}%` : `${pct.toFixed(0)}%`}</small></span>
     </button>`;
   }).join("") + (hasAvg ? `<div class="hbars-legend"><span><i style="width:10px;height:10px;border-radius:3px;background:var(--series-1)"></i>Deze periode</span><span><i style="width:2px;height:12px;background:var(--text-primary);opacity:.55"></i>Gemiddelde ${s.prev_months} maanden ervoor</span></div>` : "")
     : `<p class="sub">Geen uitgaven in deze periode.</p>`;
@@ -301,7 +313,9 @@ function drawCategoryBars(s) {
     const c = cats.find((x) => x.category === b.dataset.cat);
     b.addEventListener("click", () => { state.selectedCat = c.category; drawCategoryBars(s); drawDetail(s); });
     b.addEventListener("mousemove", (e) => {
-      let html = `<div class="t">${esc(c.category)}</div><div class="row"><span>${esc(periodLabel(s.period))}</span><b>${fmt(c.total)}</b></div>`;
+      let html = `<div class="t">${esc(c.category)}</div>` + (multi
+        ? `<div class="row"><span>Per maand</span><b>${fmt(c.per_month)}</b></div><div class="row"><span>Totaal ${esc(periodLabel(s.period))}</span><span>${fmt(c.total)}</span></div>`
+        : `<div class="row"><span>${esc(periodLabel(s.period))}</span><b>${fmt(c.total)}</b></div>`);
       if (c.avg_prev != null) {
         const diff = c.total - c.avg_prev;
         html += `<div class="row"><span>Gemiddeld ervoor</span><span>${fmt(c.avg_prev)}</span></div>
@@ -351,8 +365,10 @@ async function drawDetail(s) {
 }
 
 function drawIncome(s) {
+  const multi = s.months_in_period > 1;
   el("income-list").innerHTML = s.income_categories.length ? `<ul class="list">${s.income_categories.map((c) =>
-    `<li><div class="l"><b>${esc(c.category)}</b><span>${s.income ? ((c.total / s.income) * 100).toFixed(0) : 0}% van inkomsten</span></div><div class="r">${fmt(c.total)}</div></li>`).join("")}</ul>`
+    `<li><div class="l"><b>${esc(c.category)}</b><span>${s.income ? ((c.total / s.income) * 100).toFixed(0) : 0}% van inkomsten${multi ? ` · totaal ${fmt0(c.total)}` : ""}</span></div>
+      <div class="r">${fmt(multi ? c.per_month : c.total)}${multi ? `<span class="sub" style="display:block;font-size:11px">p/m</span>` : ""}</div></li>`).join("")}</ul>`
     : `<p class="sub">Geen inkomsten in deze periode.</p>`;
 }
 
